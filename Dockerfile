@@ -6,10 +6,12 @@ RUN apt-get update && apt-get install -y \
     texlive-fonts-recommended \
     texlive-latex-extra \
     texlive-fonts-extra \
-    && apt-get clean
+    texlive-bibtex-extra \
+    biber \
+    && rm -rf /var/lib/apt/lists/*
 
-COPY package.json bun.lock* ./
-RUN bun install
+COPY package.json ./
+RUN bun install --no-cache
 
 COPY . .
 RUN bun run build

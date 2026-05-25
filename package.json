@@ -10,9 +10,11 @@
   },
   "dependencies": {
     "@ai-sdk/google": "^3.0.79",
+    "@types/pdf-parse": "^1.1.5",
     "ai": "^6.0.191",
     "handlebars": "^4.7.9",
     "next": "16.2.6",
+    "pdfjs-dist": "^5.7.284",
     "react": "19.2.4",
     "react-dom": "19.2.4",
     "zod": "^4.4.3"
