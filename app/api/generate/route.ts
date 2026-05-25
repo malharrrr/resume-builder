@@ -1,71 +1,145 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { generateText } from 'ai';
+import { generateObject } from 'ai';
 import { google } from '@ai-sdk/google';
+import { z } from 'zod';
+import Handlebars from 'handlebars';
 import { exec } from 'child_process';
 import { promisify } from 'util';
 import fs from 'fs/promises';
 import path from 'path';
 import crypto from 'crypto';
 
+if (typeof globalThis.DOMMatrix === 'undefined') {
+  (globalThis as any).DOMMatrix = class DOMMatrix {};
+}
+
+Handlebars.Utils.escapeExpression = function (text: any) {
+  if (typeof text !== 'string') return text;
+  return text
+    .replace(/\\/g, '\\textbackslash ')
+    .replace(/&/g, '\\&')
+    .replace(/%/g, '\\%')
+    .replace(/\$/g, '\\$')
+    .replace(/#/g, '\\#')
+    .replace(/_/g, '\\_')
+    .replace(/{/g, '\\{')
+    .replace(/}/g, '\\}')
+    .replace(/~/g, '\\textasciitilde ')
+    .replace(/\^/g, '\\textasciicircum ');
+};
+
 const execAsync = promisify(exec);
+
+async function extractTextFromPDF(buffer: ArrayBuffer): Promise<string> {
+  const pdfjsLib = await import('pdfjs-dist/legacy/build/pdf.mjs');
+  pdfjsLib.GlobalWorkerOptions.workerSrc = 'pdfjs-dist/legacy/build/pdf.worker.mjs';
+
+  const loadingTask = pdfjsLib.getDocument({ data: new Uint8Array(buffer) });
+  const pdf = await loadingTask.promise;
+  let text = '';
+  
+  for (let i = 1; i <= pdf.numPages; i++) {
+    const page = await pdf.getPage(i);
+    const content = await page.getTextContent();
+    const pageText = content.items.map((item: any) => item.str).join(' ');
+    text += pageText + '\n';
+  }
+  return text;
+}
+
+function trimJD(jd: string) {
+  const boilerplateMarkers = ["equal opportunity", "benefits", "what we offer", "about us", "perks"];
+  let trimmed = jd;
+  for (const marker of boilerplateMarkers) {
+    const idx = trimmed.toLowerCase().indexOf(marker);
+    if (idx > -1) trimmed = trimmed.substring(0, idx);
+  }
+  return trimmed.slice(0, 4000); 
+}
 
 export async function POST(req: NextRequest) {
   const uniqueId = crypto.randomUUID();
   const tempDir = path.join(process.cwd(), 'tmp');
   const texPath = path.join(tempDir, `resume_${uniqueId}.tex`);
   const pdfPath = path.join(tempDir, `resume_${uniqueId}.pdf`);
-  const logPath = path.join(tempDir, `resume_${uniqueId}.log`);
-  const auxPath = path.join(tempDir, `resume_${uniqueId}.aux`);
-
+  
   try {
     const formData = await req.formData();
     const resumeFile = formData.get('resume') as Blob;
-    const jobDescription = formData.get('jobDescription') as string;
+    const rawJD = formData.get('jobDescription') as string;
 
-    if (!resumeFile || !jobDescription) {
-      return NextResponse.json({ error: 'Missing resume or JD' }, { status: 400 });
-    }
+    if (!resumeFile || !rawJD) return NextResponse.json({ error: 'Missing inputs' }, { status: 400 });
+
+    const fileBuffer = await resumeFile.arrayBuffer();
+    const pureTextResume = await extractTextFromPDF(fileBuffer);
+    const trimmedJD = trimJD(rawJD);
+
+    const { object: resumeData } = await generateObject({
+      model: google('gemini-3.1-flash-lite'),
+      schema: z.object({
+        name: z.string(),
+        github_username: z.string().optional(),
+        linkedin_username: z.string().optional(),
+        email: z.string(),
+        phone: z.string(),
+        website: z.string().optional(),
+        website_display: z.string().optional(),
+        summary: z.string(),
+        experiences: z.array(z.object({
+          title: z.string(),
+          dates: z.string(),
+          bulletPoints: z.array(z.string())
+        })),
+        projects: z.array(z.object({
+          name: z.string(),
+          link: z.string(),
+          link_text: z.string(),
+          description: z.string()
+        })),
+        education: z.array(z.object({
+          years: z.string(),
+          degree: z.string(),
+          institution: z.string(),
+          gpa: z.string()
+        })),
+        skills: z.array(z.object({
+          category: z.string(),
+          items: z.string()
+        }))
+      }),
+      prompt: `
+        You are an expert ATS resume optimizing engine. Your objective is to parse the candidate's 'Resume Text' and tailor it to the 'Target JD' with absolute factual accuracy.
+
+        STRICT PROCESSING RULES:
+        
+        1. ZERO HALLUCINATION (CRITICAL): 
+           - You must NEVER invent, assume, or fabricate skills, metrics, degrees, or experiences. 
+           - Every claim in the output must be directly supported by the provided Resume Text.
+
+        2. SMART FILTERING & RELEVANCY:
+           - Analyze the candidate's Projects and Work Experience against the JD.
+           - REMOVE projects or roles that are completely irrelevant to the target job (e.g., omit a purely graphic design project if applying for a strict backend data engineering role).
+           - RETAIN projects that belong to the same overarching industry or domain as the JD (e.g., if applying for any AI role, keep ALL AI/ML projects; if applying for a web dev role, keep ALL web dev projects). When in doubt, keep it.
+
+        3. STRATEGIC TAILORING:
+           - Rephrase the professional summary and experience bullet points to naturally mirror the vocabulary, tone, and keywords of the Target JD.
+           - Highlight the metrics and achievements from the Resume Text that best prove the candidate can handle the JD's specific requirements.
+
+        Target Job Description:
+        ${trimmedJD}
+
+        Source Resume Text:
+        ${pureTextResume}
+      `
+    });
 
     const templatePath = path.join(process.cwd(), 'base_template.tex');
     const baseTemplate = await fs.readFile(templatePath, 'utf-8');
-
-    const fileBuffer = await resumeFile.arrayBuffer();
-    const fileUint8 = new Uint8Array(fileBuffer);
-
-    const { text: generatedLatex } = await generateText({
-      model: google('gemini-3.1-flash-lite'),
-      messages: [
-        {
-          role: 'user',
-          content: [
-            { 
-              type: 'text', 
-              text: `You are an expert ATS resume writer and LaTeX engineer. 
-              TASK:
-              1. Extract the candidate's core skills and experience from the attached resume.
-              2. Tailor their achievements to perfectly match the provided Job Description.
-              3. Inject this into the provided LaTeX Template.
-              4. Return ONLY valid, compilable LaTeX code. Do not include markdown formatting.
-              5. CRITICAL: Remove the 'biblatex' package and '\\begin{refsection}'.
-              6. CRITICAL ESCAPING: You MUST escape special LaTeX characters. Ampersands (&) must become \\&. Percentages (%) must become \\%. Underscores (_) must become \\_.
-              
-              JOB DESCRIPTION:
-              ${jobDescription}
-              
-              LATEX TEMPLATE TO MODIFY:
-              ${baseTemplate}` 
-            },
-            { type: 'file', data: fileUint8, mediaType: resumeFile.type }
-          ]
-        }
-      ]
-    });
-
-    const cleanLatex = generatedLatex.replace(/^```latex\n/, '').replace(/\n```$/, '');
+    const template = Handlebars.compile(baseTemplate);
+    const compiledTex = template(resumeData);
 
     await fs.mkdir(tempDir, { recursive: true });
-    await fs.writeFile(texPath, cleanLatex);
-
+    await fs.writeFile(texPath, compiledTex);
     await execAsync(`pdflatex -interaction=nonstopmode -output-directory=${tempDir} ${texPath}`);
 
     const pdfBuffer = await fs.readFile(pdfPath);
@@ -81,9 +155,9 @@ export async function POST(req: NextRequest) {
     console.error(`Generation Error [${uniqueId}]:`, error);
     return NextResponse.json({ error: 'Failed to process resume' }, { status: 500 });
   } finally {
-    const cleanUp = async (filePath: string) => {
-      try { await fs.rm(filePath); } catch (e) { /* Ignore missing files */ }
+    const cleanUp = async (ext: string) => {
+      try { await fs.rm(path.join(tempDir, `resume_${uniqueId}${ext}`)); } catch (e) {}
     };
-    await Promise.all([cleanUp(texPath), cleanUp(pdfPath), cleanUp(logPath), cleanUp(auxPath)]);
+    await Promise.all(['.tex', '.pdf', '.log', '.aux', '.out'].map(cleanUp));
   }
 }

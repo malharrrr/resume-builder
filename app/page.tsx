@@ -6,6 +6,7 @@ export default function ResumeBuilder() {
   const [jd, setJd] = useState('');
   const [pdfUrl, setPdfUrl] = useState<string | null>(null);
   const [isGenerating, setIsGenerating] = useState(false);
+  const [lastHash, setLastHash] = useState<string | null>(null);
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files[0]) {
@@ -15,9 +16,15 @@ export default function ResumeBuilder() {
 
   const generateResume = async () => {
     if (!resumeFile || !jd) return;
+    const currentHash = `${resumeFile.name}-${jd.length}-${jd.substring(0, 20)}`;
+    if (currentHash === lastHash && pdfUrl) {
+      alert("Inputs haven't changed. Displaying cached result.");
+      return;
+    }
+
     setIsGenerating(true);
     setPdfUrl(null);
-
+    
     try {
       const formData = new FormData();
       formData.append('resume', resumeFile);
@@ -33,6 +40,8 @@ export default function ResumeBuilder() {
       const blob = await response.blob();
       const url = URL.createObjectURL(blob);
       setPdfUrl(url);
+      setLastHash(currentHash); 
+
     } catch (err) {
       console.error(err);
       alert("Error compiling resume. Check the job description for unusual characters.");
@@ -70,13 +79,14 @@ export default function ResumeBuilder() {
             </div>
           </div>
 
+          {/* JD Input */}
           <div className="space-y-3 flex flex-col flex-grow">
             <label className="text-xs font-semibold uppercase tracking-wider text-zinc-500">
               Target Job Description
             </label>
             <textarea 
               className="flex-grow w-full min-h-[300px] p-4 bg-zinc-900/50 border border-zinc-800 rounded-md text-sm font-mono text-zinc-300 focus:outline-none focus:border-white focus:ring-1 focus:ring-white transition-all resize-none"
-              placeholder="Paste the JD here..."
+              placeholder="Paste the target JD here..."
               value={jd}
               onChange={(e) => setJd(e.target.value)}
             />
