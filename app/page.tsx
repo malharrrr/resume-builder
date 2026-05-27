@@ -5,6 +5,7 @@ export default function ResumeBuilder() {
   const [resumeFile, setResumeFile] = useState<File | null>(null);
   const [jd, setJd] = useState('');
   const [pdfUrl, setPdfUrl] = useState<string | null>(null);
+  const [pdfBase64, setPdfBase64] = useState<string | null>(null);
   const [texData, setTexData] = useState<string | null>(null);
   const [isGenerating, setIsGenerating] = useState(false);
   const [lastHash, setLastHash] = useState<string | null>(null);
@@ -26,6 +27,7 @@ export default function ResumeBuilder() {
 
     setIsGenerating(true);
     setPdfUrl(null);
+    setPdfBase64(null);
     setTexData(null);
     
     try {
@@ -54,6 +56,7 @@ export default function ResumeBuilder() {
       const url = URL.createObjectURL(blob);
       
       setPdfUrl(url);
+      setPdfBase64(data.pdf);
       setTexData(data.tex);
       setLastHash(currentHash);
 
@@ -77,16 +80,35 @@ export default function ResumeBuilder() {
     URL.revokeObjectURL(url);
   };
 
+  const downloadPdf = () => {
+    if (!pdfBase64) return;
+    const byteCharacters = atob(pdfBase64);
+    const byteNumbers = new Array(byteCharacters.length);
+    for (let i = 0; i < byteCharacters.length; i++) {
+      byteNumbers[i] = byteCharacters.charCodeAt(i);
+    }
+    const byteArray = new Uint8Array(byteNumbers);
+    const blob = new Blob([byteArray], { type: 'application/pdf' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'tailored_resume.pdf';
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  };
+
   return (
-    <div className="flex h-screen w-full bg-zinc-950 text-zinc-300 font-sans selection:bg-white selection:text-black">
-      <div className="w-full lg:w-1/2 flex flex-col p-8 lg:p-12 border-r border-zinc-800 overflow-y-auto">
+    <div className="flex flex-col lg:flex-row min-h-screen h-screen w-full bg-zinc-950 text-zinc-300 font-sans selection:bg-white selection:text-black overflow-hidden">
+      <div className={`w-full lg:w-1/2 flex-col p-6 sm:p-8 lg:p-12 border-b lg:border-b-0 lg:border-r border-zinc-800 overflow-y-auto shrink-0 h-full ${pdfUrl ? 'hidden lg:flex' : 'flex'}`}>
         
-        <div className="mb-10">
-          <h1 className="text-3xl font-medium text-white tracking-tight">Resume OS</h1>
-          <p className="text-sm text-zinc-500 mt-2">Dynamic ATS optimization workflow.</p>
+        <div className="mb-6 sm:mb-10">
+          <h1 className="text-2xl sm:text-3xl font-medium text-white tracking-tight">Resume OS</h1>
+          <p className="text-xs sm:text-sm text-zinc-500 mt-2">Dynamic ATS optimization workflow.</p>
         </div>
         
-        <div className="space-y-8 flex-grow">
+        <div className="space-y-6 sm:space-y-8 flex-grow">
           <div className="space-y-3">
             <label className="text-xs font-semibold uppercase tracking-wider text-zinc-500">
               Source Document
@@ -99,10 +121,10 @@ export default function ResumeBuilder() {
                 className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10"
               />
               <div className={`w-full p-4 border border-zinc-800 rounded-md bg-zinc-900/50 flex items-center justify-between group-hover:border-zinc-600 transition-colors ${resumeFile ? 'border-white/30 text-white' : ''}`}>
-                <span className="text-sm truncate">
+                <span className="text-sm truncate pr-2">
                   {resumeFile ? resumeFile.name : 'Upload current resume (PDF/TXT)'}
                 </span>
-                <span className="text-xs border border-zinc-700 px-2 py-1 rounded bg-zinc-900">Browse</span>
+                <span className="text-xs border border-zinc-700 px-2 py-1 rounded bg-zinc-900 shrink-0">Browse</span>
               </div>
             </div>
           </div>
@@ -112,7 +134,7 @@ export default function ResumeBuilder() {
               Target Job Description
             </label>
             <textarea 
-              className="flex-grow w-full min-h-[300px] p-4 bg-zinc-900/50 border border-zinc-800 rounded-md text-sm font-mono text-zinc-300 focus:outline-none focus:border-white focus:ring-1 focus:ring-white transition-all resize-none"
+              className="w-full min-h-[250px] lg:flex-grow p-4 bg-zinc-900/50 border border-zinc-800 rounded-md text-sm font-mono text-zinc-300 focus:outline-none focus:border-white focus:ring-1 focus:ring-white transition-all resize-none"
               placeholder="Paste the target JD here..."
               value={jd}
               onChange={(e) => setJd(e.target.value)}
@@ -120,7 +142,7 @@ export default function ResumeBuilder() {
           </div>
         </div>
 
-        <div className="mt-8">
+        <div className="mt-6 sm:mt-8">
           <button 
             onClick={generateResume}
             disabled={isGenerating || !resumeFile || !jd}
@@ -135,27 +157,58 @@ export default function ResumeBuilder() {
           </button>
         </div>
       </div>
-      <div className="hidden lg:flex w-1/2 bg-[#0A0A0A] flex-col items-center justify-center p-8">
+      
+      <div className={`w-full lg:w-1/2 bg-[#0A0A0A] flex-col items-center justify-center p-6 sm:p-8 shrink-0 h-full overflow-y-auto ${pdfUrl ? 'flex' : 'hidden lg:flex'}`}>
+        
         {pdfUrl ? (
-          <div className="flex flex-col w-full h-full max-h-full">
-            <div className="flex justify-between items-center mb-4">
-              <span className="text-sm font-medium text-zinc-400">Preview Generation Complete</span>
-              <button
-                onClick={downloadTex}
-                className="flex items-center gap-2 px-3 py-1.5 text-xs font-semibold text-zinc-900 bg-white rounded hover:bg-zinc-200 transition-colors"
-              >
-                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"></path>
+          <>
+            <div className="hidden lg:flex flex-col w-full h-full max-h-full">
+              <div className="flex justify-between items-center mb-4">
+                <span className="text-sm font-medium text-zinc-400">Preview Generation Complete</span>
+                <div className="flex items-center gap-2">
+                  <button onClick={downloadPdf} className="flex items-center gap-2 px-3 py-1.5 text-xs font-semibold text-white bg-zinc-900 border border-zinc-800 rounded hover:bg-zinc-800 transition-colors">
+                    Get PDF
+                  </button>
+                  <button onClick={downloadTex} className="flex items-center gap-2 px-3 py-1.5 text-xs font-semibold text-zinc-900 bg-white rounded hover:bg-zinc-200 transition-colors">
+                    Get .tex
+                  </button>
+                </div>
+              </div>
+              <div className="relative w-full flex-grow rounded-md overflow-hidden bg-white border border-zinc-800">
+                <iframe src={pdfUrl} className="absolute inset-0 w-full h-full" title="Resume Preview"/>
+              </div>
+            </div>
+
+            <div className="flex lg:hidden flex-col items-center justify-center w-full h-full space-y-6">
+              <div className="w-20 h-20 bg-green-500/10 text-green-500 rounded-full flex items-center justify-center mb-2">
+                <svg className="w-10 h-10" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 13l4 4L19 7"></path>
                 </svg>
-                Download .tex
+              </div>
+              
+              <div className="text-center space-y-2">
+                <h2 className="text-2xl font-bold text-white tracking-tight">Resume Ready!</h2>
+                <p className="text-sm text-zinc-400 max-w-[250px] mx-auto">
+                  Your ATS-optimized resume has been compiled successfully.
+                </p>
+              </div>
+
+              <div className="w-full flex flex-col gap-3 mt-8 max-w-sm">
+                <button onClick={downloadPdf} className="w-full py-4 bg-white text-black font-semibold rounded-md shadow-sm hover:bg-zinc-200 transition-colors flex justify-center items-center gap-2">
+                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"></path></svg>
+                  Download PDF
+                </button>
+                <button onClick={downloadTex} className="w-full py-4 bg-zinc-900 border border-zinc-800 text-white font-semibold rounded-md hover:bg-zinc-800 transition-colors flex justify-center items-center gap-2">
+                  <svg className="w-5 h-5 text-zinc-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M10 20l4-16m4 4l4 4-4 4M6 16l-4-4 4-4"></path></svg>
+                  Download Source (.tex)
+                </button>
+              </div>
+
+              <button onClick={() => setPdfUrl(null)} className="mt-8 text-sm text-zinc-500 hover:text-white transition-colors underline underline-offset-4">
+                Start a new optimization
               </button>
             </div>
-            <iframe 
-              src={pdfUrl} 
-              className="w-full flex-grow rounded-md shadow-2xl bg-white border border-zinc-800" 
-              title="Resume Preview"
-            />
-          </div>
+          </>
         ) : (
           <div className="flex flex-col items-center justify-center text-zinc-700">
             <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1" strokeLinecap="round" strokeLinejoin="round" className="mb-4 opacity-50">
