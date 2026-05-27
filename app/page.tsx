@@ -5,6 +5,7 @@ export default function ResumeBuilder() {
   const [resumeFile, setResumeFile] = useState<File | null>(null);
   const [jd, setJd] = useState('');
   const [pdfUrl, setPdfUrl] = useState<string | null>(null);
+  const [texData, setTexData] = useState<string | null>(null);
   const [isGenerating, setIsGenerating] = useState(false);
   const [lastHash, setLastHash] = useState<string | null>(null);
 
@@ -16,6 +17,7 @@ export default function ResumeBuilder() {
 
   const generateResume = async () => {
     if (!resumeFile || !jd) return;
+
     const currentHash = `${resumeFile.name}-${jd.length}-${jd.substring(0, 20)}`;
     if (currentHash === lastHash && pdfUrl) {
       alert("Inputs haven't changed. Displaying cached result.");
@@ -24,6 +26,7 @@ export default function ResumeBuilder() {
 
     setIsGenerating(true);
     setPdfUrl(null);
+    setTexData(null);
     
     try {
       const formData = new FormData();
@@ -35,18 +38,43 @@ export default function ResumeBuilder() {
         body: formData,
       });
       
-      if (!response.ok) throw new Error("Compilation failed");
+      const data = await response.json();
+      
+      if (!response.ok) {
+        throw new Error(data.error || "Compilation failed");
+      }
 
-      const blob = await response.blob();
+      const byteCharacters = atob(data.pdf);
+      const byteNumbers = new Array(byteCharacters.length);
+      for (let i = 0; i < byteCharacters.length; i++) {
+        byteNumbers[i] = byteCharacters.charCodeAt(i);
+      }
+      const byteArray = new Uint8Array(byteNumbers);
+      const blob = new Blob([byteArray], { type: 'application/pdf' });
       const url = URL.createObjectURL(blob);
+      
       setPdfUrl(url);
-      setLastHash(currentHash); 
+      setTexData(data.tex);
+      setLastHash(currentHash);
 
-    } catch (err) {
+    } catch (err: any) {
       console.error(err);
-      alert("Error compiling resume. Check the job description for unusual characters.");
+      alert(err.message || "Error compiling resume. Please try again.");
     }
     setIsGenerating(false);
+  };
+
+  const downloadTex = () => {
+    if (!texData) return;
+    const blob = new Blob([texData], { type: 'text/plain' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'tailored_resume.tex';
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
   };
 
   return (
@@ -79,7 +107,6 @@ export default function ResumeBuilder() {
             </div>
           </div>
 
-          {/* JD Input */}
           <div className="space-y-3 flex flex-col flex-grow">
             <label className="text-xs font-semibold uppercase tracking-wider text-zinc-500">
               Target Job Description
@@ -108,14 +135,27 @@ export default function ResumeBuilder() {
           </button>
         </div>
       </div>
-
-      <div className="hidden lg:flex w-1/2 bg-[#0A0A0A] items-center justify-center p-8">
+      <div className="hidden lg:flex w-1/2 bg-[#0A0A0A] flex-col items-center justify-center p-8">
         {pdfUrl ? (
-          <iframe 
-            src={pdfUrl} 
-            className="w-full h-full rounded-md shadow-2xl bg-white border border-zinc-800" 
-            title="Resume Preview"
-          />
+          <div className="flex flex-col w-full h-full max-h-full">
+            <div className="flex justify-between items-center mb-4">
+              <span className="text-sm font-medium text-zinc-400">Preview Generation Complete</span>
+              <button
+                onClick={downloadTex}
+                className="flex items-center gap-2 px-3 py-1.5 text-xs font-semibold text-zinc-900 bg-white rounded hover:bg-zinc-200 transition-colors"
+              >
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"></path>
+                </svg>
+                Download .tex
+              </button>
+            </div>
+            <iframe 
+              src={pdfUrl} 
+              className="w-full flex-grow rounded-md shadow-2xl bg-white border border-zinc-800" 
+              title="Resume Preview"
+            />
+          </div>
         ) : (
           <div className="flex flex-col items-center justify-center text-zinc-700">
             <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1" strokeLinecap="round" strokeLinejoin="round" className="mb-4 opacity-50">

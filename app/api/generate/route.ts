@@ -135,8 +135,8 @@ export async function POST(req: NextRequest) {
 
         2. SMART FILTERING & RELEVANCY:
            - Analyze the candidate's Projects and Work Experience against the JD.
-           - REMOVE projects or roles that are completely irrelevant to the target job (e.g., omit a purely graphic design project if applying for a strict backend data engineering role).
-           - RETAIN projects that belong to the same overarching industry or domain as the JD (e.g., if applying for any AI role, keep ALL AI/ML projects; if applying for a web dev role, keep ALL web dev projects). When in doubt, keep it.
+           - REMOVE projects or roles that are completely irrelevant to the target job.
+           - RETAIN projects that belong to the same overarching industry or domain as the JD. When in doubt, keep it.
 
         3. STRATEGIC TAILORING:
            - Rephrase the professional summary and experience bullet points to naturally mirror the vocabulary, tone, and keywords of the Target JD.
@@ -169,11 +169,9 @@ export async function POST(req: NextRequest) {
 
     const pdfBuffer = await fs.readFile(pdfPath);
     
-    return new NextResponse(pdfBuffer, {
-      headers: {
-        'Content-Type': 'application/pdf',
-        'Content-Disposition': `inline; filename="tailored_resume.pdf"`,
-      },
+    return NextResponse.json({
+      pdf: pdfBuffer.toString('base64'),
+      tex: compiledTex
     });
 
   } catch (error) {
