@@ -100,7 +100,7 @@ export default function ResumeBuilder() {
   };
 
   return (
-    <div className="flex flex-col lg:flex-row min-h-screen h-screen w-full bg-zinc-950 text-zinc-300 font-sans selection:bg-white selection:text-black overflow-hidden">
+    <div className="flex flex-col lg:flex-row min-h-[100dvh] h-[100dvh] w-full bg-zinc-950 text-zinc-300 font-sans selection:bg-white selection:text-black overflow-hidden">
       <div className={`w-full lg:w-1/2 flex-col p-6 sm:p-8 lg:p-12 border-b lg:border-b-0 lg:border-r border-zinc-800 overflow-y-auto shrink-0 h-full ${pdfUrl ? 'hidden lg:flex' : 'flex'}`}>
         
         <div className="mb-6 sm:mb-10">
@@ -116,7 +116,7 @@ export default function ResumeBuilder() {
             <div className="relative group">
               <input 
                 type="file" 
-                accept=".pdf,.txt"
+                accept=".pdf,application/pdf,.txt,text/plain"
                 onChange={handleFileChange}
                 className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10"
               />
