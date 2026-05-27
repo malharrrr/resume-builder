@@ -1,7 +1,7 @@
-FROM oven/bun:1 AS base
+FROM oven/bun:1
 WORKDIR /app
 
-RUN apt-get update && apt-get install -y \
+RUN apt-get update && apt-get install -y --no-install-recommends \
     texlive-latex-base \
     texlive-fonts-recommended \
     texlive-latex-extra \
@@ -10,8 +10,8 @@ RUN apt-get update && apt-get install -y \
     biber \
     && rm -rf /var/lib/apt/lists/*
 
-COPY package.json ./
-RUN bun install --no-cache
+COPY package.json bun.lockb ./
+RUN bun install --frozen-lockfile
 
 COPY . .
 RUN bun run build
