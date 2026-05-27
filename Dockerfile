@@ -10,7 +10,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     biber \
     && rm -rf /var/lib/apt/lists/*
 
-COPY package.json bun.lockb ./
+COPY package.json bun.lock ./
 RUN bun install --frozen-lockfile
 
 COPY . .
