@@ -10,14 +10,28 @@ export default function ResumeBuilder() {
   const [isGenerating, setIsGenerating] = useState(false);
   const [lastHash, setLastHash] = useState<string | null>(null);
 
+  const logUserAction = async (action: string, details?: any) => {
+    try {
+      await fetch('/api/log', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action, details }),
+      });
+    } catch (e) {
+    }
+  };
+
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files[0]) {
-      setResumeFile(e.target.files[0]);
+      const file = e.target.files[0];
+      setResumeFile(file);
+      logUserAction('FILE_UPLOADED', { fileName: file.name, fileSize: file.size, type: file.type });
     }
   };
 
   const generateResume = async () => {
     if (!resumeFile || !jd) return;
+    logUserAction('GENERATE_BUTTON_CLICKED', { jdLength: jd.length });
 
     const currentHash = `${resumeFile.name}-${jd.length}-${jd.substring(0, 20)}`;
     if (currentHash === lastHash && pdfUrl) {
@@ -59,9 +73,11 @@ export default function ResumeBuilder() {
       setPdfBase64(data.pdf);
       setTexData(data.tex);
       setLastHash(currentHash);
+      logUserAction('GENERATE_SUCCESS');
 
     } catch (err: any) {
       console.error(err);
+      logUserAction('GENERATE_FAILED', { error: err.message });
       alert(err.message || "Error compiling resume. Please try again.");
     }
     setIsGenerating(false);
@@ -69,6 +85,7 @@ export default function ResumeBuilder() {
 
   const downloadTex = () => {
     if (!texData) return;
+    logUserAction('DOWNLOAD_TEX_CLICKED');
     const blob = new Blob([texData], { type: 'text/plain' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
@@ -82,6 +99,7 @@ export default function ResumeBuilder() {
 
   const downloadPdf = () => {
     if (!pdfBase64) return;
+    logUserAction('DOWNLOAD_PDF_CLICKED');
     const byteCharacters = atob(pdfBase64);
     const byteNumbers = new Array(byteCharacters.length);
     for (let i = 0; i < byteCharacters.length; i++) {
@@ -157,7 +175,7 @@ export default function ResumeBuilder() {
           </button>
         </div>
       </div>
-      
+
       <div className={`w-full lg:w-1/2 bg-[#0A0A0A] flex-col items-center justify-center p-6 sm:p-8 shrink-0 h-full overflow-y-auto ${pdfUrl ? 'flex' : 'hidden lg:flex'}`}>
         
         {pdfUrl ? (

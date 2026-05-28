@@ -79,17 +79,22 @@ export async function POST(req: NextRequest) {
   const tempDir = path.join(process.cwd(), 'tmp');
   const texPath = path.join(tempDir, `resume_${uniqueId}.tex`);
   const pdfPath = path.join(tempDir, `resume_${uniqueId}.pdf`);
-  
+  console.log(`[GENERATE_START] Initializing job ${uniqueId}`);
+
   try {
     const formData = await req.formData();
     const resumeFile = formData.get('resume') as Blob;
     const rawJD = formData.get('jobDescription') as string;
 
-    if (!resumeFile || !rawJD) return NextResponse.json({ error: 'Missing inputs' }, { status: 400 });
+    if (!resumeFile || !rawJD) {
+      console.warn(`[GENERATE_WARN] Job ${uniqueId} rejected: Missing inputs`);
+      return NextResponse.json({ error: 'Missing inputs' }, { status: 400 });
+    }
 
     const fileBuffer = await resumeFile.arrayBuffer();
     const pureTextResume = await extractTextFromPDF(fileBuffer);
     const trimmedJD = trimJD(rawJD);
+    console.log(`[GENERATE_INFO] Job ${uniqueId} | JD Length: ${trimmedJD.length} chars | PDF Text Length: ${pureTextResume.length} chars`);
 
     const { object: resumeData } = await generateObject({
       model: google('gemini-3.1-flash-lite'),
@@ -154,8 +159,10 @@ export async function POST(req: NextRequest) {
     });
 
     if (resumeData.name === 'INVALID_JD') {
+      console.warn(`[GENERATE_SECURITY] Job ${uniqueId} rejected: Malicious JD detected`);
       return NextResponse.json({ error: 'Malicious or invalid job description detected.' }, { status: 400 });
     }
+    console.log(`[GENERATE_INFO] Job ${uniqueId} | Gemini object generation successful`);
 
     const sanitizedData = sanitizeEmojisAndUnicode(resumeData);
     const templatePath = path.join(process.cwd(), 'base_template.tex');
@@ -165,9 +172,11 @@ export async function POST(req: NextRequest) {
 
     await fs.mkdir(tempDir, { recursive: true });
     await fs.writeFile(texPath, compiledTex);
+    console.log(`[GENERATE_INFO] Job ${uniqueId} | Starting pdflatex compilation`);
     await execAsync(`pdflatex -interaction=nonstopmode -output-directory=${tempDir} ${texPath}`);
 
     const pdfBuffer = await fs.readFile(pdfPath);
+    console.log(`[GENERATE_SUCCESS] Job ${uniqueId} | Sending response`);
     
     return NextResponse.json({
       pdf: pdfBuffer.toString('base64'),
@@ -175,7 +184,7 @@ export async function POST(req: NextRequest) {
     });
 
   } catch (error) {
-    console.error(`Generation Error [${uniqueId}]:`, error);
+    console.error(`[GENERATE_ERROR] Job ${uniqueId} Failed:`, error);
     return NextResponse.json({ error: 'Failed to process resume' }, { status: 500 });
   } finally {
     const cleanUp = async (ext: string) => {
