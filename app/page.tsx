@@ -24,6 +24,13 @@ export default function ResumeBuilder() {
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files[0]) {
       const file = e.target.files[0];
+
+      if (file.size > 5 * 1024 * 1024) {
+        alert('Resume file exceeds 5MB limit. Please reduce file size and try again.');
+        logUserAction('FILE_UPLOAD_REJECTED_SIZE', { fileName: file.name, fileSize: file.size });
+        return;
+      }
+      
       setResumeFile(file);
       logUserAction('FILE_UPLOADED', { fileName: file.name, fileSize: file.size, type: file.type });
     }
@@ -31,11 +38,18 @@ export default function ResumeBuilder() {
 
   const generateResume = async () => {
     if (!resumeFile || !jd) return;
+    if (jd.trim().length < 100) {
+      alert('Please provide a complete job description (at least 100 characters).');
+      logUserAction('GENERATE_REJECTED_SHORT_JD', { jdLength: jd.length });
+      return;
+    }
+    
     logUserAction('GENERATE_BUTTON_CLICKED', { jdLength: jd.length });
 
     const currentHash = `${resumeFile.name}-${jd.length}-${jd.substring(0, 20)}`;
     if (currentHash === lastHash && pdfUrl) {
       alert("Inputs haven't changed. Displaying cached result.");
+      logUserAction('GENERATE_CACHED_RESULT');
       return;
     }
 
@@ -77,8 +91,23 @@ export default function ResumeBuilder() {
 
     } catch (err: any) {
       console.error(err);
-      logUserAction('GENERATE_FAILED', { error: err.message });
-      alert(err.message || "Error compiling resume. Please try again.");
+      const errorMsg = err.message || "Error compiling resume. Please try again.";
+      logUserAction('GENERATE_FAILED', { error: errorMsg });
+      if (errorMsg.includes('exceeds 5MB')) {
+        alert('Resume file is too large. Maximum size is 5MB. Please reduce and try again.');
+      } else if (errorMsg.includes('scan or image')) {
+        alert('Resume must be a text-based PDF, not a scanned image. Please use a text-based PDF.');
+      } else if (errorMsg.includes('Corrupted')) {
+        alert('Resume file appears to be corrupted. Please try a different file.');
+      } else if (errorMsg.includes('Job description')) {
+        alert('Please provide a complete job description (at least 100 characters).');
+      } else if (errorMsg.includes('suspicious')) {
+        alert('Job description validation failed. Please provide a legitimate job description.');
+      } else if (errorMsg.includes('Missing inputs')) {
+        alert('Please upload a resume and provide a job description.');
+      } else {
+        alert(errorMsg);
+      }
     }
     setIsGenerating(false);
   };
@@ -145,6 +174,7 @@ export default function ResumeBuilder() {
                 <span className="text-xs border border-zinc-700 px-2 py-1 rounded bg-zinc-900 shrink-0">Browse</span>
               </div>
             </div>
+            <p className="text-xs text-zinc-600">Maximum file size: 5MB</p>
           </div>
 
           <div className="space-y-3 flex flex-col flex-grow">
@@ -157,13 +187,14 @@ export default function ResumeBuilder() {
               value={jd}
               onChange={(e) => setJd(e.target.value)}
             />
+            <p className="text-xs text-zinc-600">Minimum {jd.length < 100 ? `${100 - jd.length} more` : ''} characters {jd.length >= 100 ? '✓' : ''}</p>
           </div>
         </div>
 
         <div className="mt-6 sm:mt-8">
           <button 
             onClick={generateResume}
-            disabled={isGenerating || !resumeFile || !jd}
+            disabled={isGenerating || !resumeFile || !jd || jd.trim().length < 100}
             className="w-full py-4 px-6 bg-white text-zinc-950 text-sm font-semibold rounded-md hover:bg-zinc-200 focus:outline-none focus:ring-2 focus:ring-white focus:ring-offset-2 focus:ring-offset-zinc-950 disabled:opacity-50 disabled:cursor-not-allowed transition-all flex justify-center items-center gap-2"
           >
             {isGenerating ? (
