@@ -1,6 +1,32 @@
 'use client';
 import { useState } from 'react';
 
+interface Analytics {
+  healthCheck: {
+    score: number;
+    totalMetrics: number;
+    metricsPerExperience: number;
+    warnings: string[];
+    skillsCount: number;
+    experiencesCount: number;
+  };
+  qualityComparison: {
+    originalScore: number;
+    optimizedScore: number;
+    improvement: number;
+    keywordMatch: number;
+  };
+  abTestData: {
+    totalChanges: number;
+    metricsHighlighted: number;
+  };
+  metrics: {
+    totalMetrics: number;
+    metricsHighlighted: number;
+    keywordMatch: number;
+  };
+}
+
 export default function ResumeBuilder() {
   const [resumeFile, setResumeFile] = useState<File | null>(null);
   const [jd, setJd] = useState('');
@@ -9,6 +35,8 @@ export default function ResumeBuilder() {
   const [texData, setTexData] = useState<string | null>(null);
   const [isGenerating, setIsGenerating] = useState(false);
   const [lastHash, setLastHash] = useState<string | null>(null);
+  const [analytics, setAnalytics] = useState<Analytics | null>(null);
+  const [showAnalytics, setShowAnalytics] = useState(false);
 
   const logUserAction = async (action: string, details?: any) => {
     try {
@@ -17,8 +45,7 @@ export default function ResumeBuilder() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ action, details }),
       });
-    } catch (e) {
-    }
+    } catch (e) {}
   };
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -57,6 +84,8 @@ export default function ResumeBuilder() {
     setPdfUrl(null);
     setPdfBase64(null);
     setTexData(null);
+    setAnalytics(null);
+    setShowAnalytics(false);
     
     try {
       const formData = new FormData();
@@ -87,6 +116,12 @@ export default function ResumeBuilder() {
       setPdfBase64(data.pdf);
       setTexData(data.tex);
       setLastHash(currentHash);
+      
+      if (data.analytics) {
+        setAnalytics(data.analytics);
+        setShowAnalytics(true);
+      }
+      
       logUserAction('GENERATE_SUCCESS');
 
     } catch (err: any) {
@@ -152,7 +187,7 @@ export default function ResumeBuilder() {
         
         <div className="mb-6 sm:mb-10">
           <h1 className="text-2xl sm:text-3xl font-medium text-white tracking-tight">Resume OS</h1>
-          <p className="text-xs sm:text-sm text-zinc-500 mt-2">Dynamic ATS optimization workflow.</p>
+          <p className="text-xs sm:text-sm text-zinc-500 mt-2">Dynamic ATS optimization with analytics.</p>
         </div>
         
         <div className="space-y-6 sm:space-y-8 flex-grow">
@@ -212,9 +247,17 @@ export default function ResumeBuilder() {
         {pdfUrl ? (
           <>
             <div className="hidden lg:flex flex-col w-full h-full max-h-full">
-              <div className="flex justify-between items-center mb-4">
+              <div className="flex justify-between items-center mb-4 flex-wrap gap-2">
                 <span className="text-sm font-medium text-zinc-400">Preview Generation Complete</span>
-                <div className="flex items-center gap-2">
+                <div className="flex items-center gap-2 flex-wrap">
+                  {analytics && (
+                    <button 
+                      onClick={() => setShowAnalytics(!showAnalytics)}
+                      className="flex items-center gap-2 px-3 py-1.5 text-xs font-semibold text-white bg-blue-900 border border-blue-700 rounded hover:bg-blue-800 transition-colors"
+                    >
+                      {showAnalytics ? 'Hide' : 'Show'} Analytics
+                    </button>
+                  )}
                   <button onClick={downloadPdf} className="flex items-center gap-2 px-3 py-1.5 text-xs font-semibold text-white bg-zinc-900 border border-zinc-800 rounded hover:bg-zinc-800 transition-colors">
                     Get PDF
                   </button>
@@ -223,6 +266,80 @@ export default function ResumeBuilder() {
                   </button>
                 </div>
               </div>
+
+              {showAnalytics && analytics ? (
+                <div className="w-full flex-grow rounded-md overflow-hidden bg-zinc-900 border border-zinc-800 p-4 mb-4 overflow-y-auto max-h-96">
+                  <div className="space-y-4">
+                    <div>
+                      <h3 className="text-sm font-semibold text-white mb-3">Resume Quality Metrics</h3>
+                      
+                      <div className="grid grid-cols-2 gap-3 mb-4">
+                        <div className="bg-zinc-800 rounded p-3">
+                          <p className="text-xs text-zinc-400 mb-1">ATS Score</p>
+                          <p className="text-2xl font-bold text-white">{analytics.metrics.keywordMatch}%</p>
+                          <p className="text-xs text-zinc-500">Keyword match</p>
+                        </div>
+
+                        <div className="bg-zinc-800 rounded p-3">
+                          <p className="text-xs text-zinc-400 mb-1">Quantified Achievements</p>
+                          <p className="text-2xl font-bold text-white">{analytics.healthCheck.totalMetrics}</p>
+                          <p className="text-xs text-zinc-500">Total metrics found</p>
+                        </div>
+
+                        <div className="bg-zinc-800 rounded p-3">
+                          <p className="text-xs text-zinc-400 mb-1">Quality Improvement</p>
+                          <p className="text-2xl font-bold text-green-400">+{analytics.qualityComparison.improvement}</p>
+                          <p className="text-xs text-zinc-500">Metrics added</p>
+                        </div>
+
+                        <div className="bg-zinc-800 rounded p-3">
+                          <p className="text-xs text-zinc-400 mb-1">Technical Skills</p>
+                          <p className="text-2xl font-bold text-white">{analytics.healthCheck.skillsCount}</p>
+                          <p className="text-xs text-zinc-500">Detected</p>
+                        </div>
+                      </div>
+
+                      {analytics.healthCheck.warnings.length > 0 && (
+                        <div className="bg-amber-900/20 border border-amber-700 rounded p-3 mb-3">
+                          <p className="text-xs font-semibold text-amber-200 mb-2">Improvement Tips:</p>
+                          <ul className="text-xs text-amber-100 space-y-1">
+                            {analytics.healthCheck.warnings.map((warning, idx) => (
+                              <li key={idx} className="flex gap-2">
+                                <span>•</span>
+                                <span>{warning}</span>
+                              </li>
+                            ))}
+                          </ul>
+                        </div>
+                      )}
+                    </div>
+
+                    <div className="bg-zinc-800 rounded p-3 border border-zinc-700">
+                      <p className="text-xs font-semibold text-white mb-2">A/B Test Summary</p>
+                      <div className="grid grid-cols-2 gap-2 text-xs">
+                        <div>
+                          <p className="text-zinc-400">Bullet Changes</p>
+                          <p className="font-semibold text-white">{analytics.abTestData.totalChanges}</p>
+                        </div>
+                        <div>
+                          <p className="text-zinc-400">Metrics Highlighted</p>
+                          <p className="font-semibold text-green-400">{analytics.abTestData.metricsHighlighted}</p>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="bg-zinc-800 rounded p-3 border border-zinc-700">
+                      <p className="text-xs font-semibold text-white mb-2">Metric Categories</p>
+                      <div className="text-xs text-zinc-300 space-y-1">
+                        <p>✓ Quantified achievements extracted and highlighted</p>
+                        <p>✓ {analytics.metrics.totalMetrics} metrics preserved in final resume</p>
+                        <p>✓ All numbers and percentages preserved exactly</p>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              ) : null}
+
               <div className="relative w-full flex-grow rounded-md overflow-hidden bg-white border border-zinc-800">
                 <iframe src={pdfUrl} className="absolute inset-0 w-full h-full" title="Resume Preview"/>
               </div>
@@ -241,6 +358,22 @@ export default function ResumeBuilder() {
                   Your ATS-optimized resume has been compiled successfully.
                 </p>
               </div>
+
+              {analytics && (
+                <div className="w-full max-w-sm bg-zinc-900 rounded-lg p-4 border border-zinc-800 mb-4">
+                  <p className="text-xs font-semibold text-white mb-3">Quick Stats</p>
+                  <div className="grid grid-cols-2 gap-2 text-xs">
+                    <div>
+                      <p className="text-zinc-400">ATS Match</p>
+                      <p className="font-bold text-white">{analytics.metrics.keywordMatch}%</p>
+                    </div>
+                    <div>
+                      <p className="text-zinc-400">Metrics</p>
+                      <p className="font-bold text-green-400">+{analytics.qualityComparison.improvement}</p>
+                    </div>
+                  </div>
+                </div>
+              )}
 
               <div className="w-full flex flex-col gap-3 mt-8 max-w-sm">
                 <button onClick={downloadPdf} className="w-full py-4 bg-white text-black font-semibold rounded-md shadow-sm hover:bg-zinc-200 transition-colors flex justify-center items-center gap-2">

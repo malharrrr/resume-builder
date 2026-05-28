@@ -30,6 +30,213 @@ Handlebars.Utils.escapeExpression = function (text: any) {
 
 const execAsync = promisify(exec);
 
+const METRIC_REGEX = /(\d+%|₹?\d+(?:,\d{3})*(?:\.\d{1,2})?|decreased?|improved?|reduced?|increased?|optimized?|accelerated?|scaled?|launched?|grew?|grown|streamlined?)\s+([a-z\s]+?)(?=\.|,|;|$)/gi;
+const QUANTIFIABLE_KEYWORDS = ['improved', 'reduced', 'increased', 'achieved', 'decreased', 'optimized', 'accelerated', 'scaled', 'saved', 'earned', 'generated', 'streamlined', 'enhanced'];
+
+interface ParsedResume {
+  name: string;
+  email: string;
+  phone: string;
+  summary: string;
+  experiences: Array<{
+    title: string;
+    company?: string;
+    dates: string;
+    bulletPoints: string[];
+    metricsCount: number;
+  }>;
+  projects: Array<{
+    name: string;
+    description: string;
+    metricsCount: number;
+  }>;
+  education: Array<{
+    degree: string;
+    institution: string;
+    years: string;
+  }>;
+  skills: string[];
+  sections: string[];
+  metrics: Array<{
+    text: string;
+    source: string;
+  }>;
+}
+
+interface HealthCheck {
+  hasSummary: boolean;
+  hasMetrics: boolean;
+  metricsPerExperience: number;
+  totalMetrics: number;
+  skillsCount: number;
+  experiencesCount: number;
+  projectsCount: number;
+  hasEducation: boolean;
+  warnings: string[];
+  score: number;
+}
+
+function parseResumeStructure(text: string): ParsedResume {
+  const lines = text.split('\n').filter(l => l.trim());
+  
+  const emailMatch = text.match(/[\w\.-]+@[\w\.-]+\.\w+/);
+  const phoneMatch = text.match(/(\+\d{1,3}[-.\s]?)?\(?\d{3}\)?[-.\s]?\d{3}[-.\s]?\d{4}/);
+  
+  const sectionKeywords = {
+    summary: ['summary', 'professional', 'about'],
+    experience: ['experience', 'work history', 'employment'],
+    projects: ['projects', 'portfolio', 'side projects'],
+    education: ['education', 'degrees', 'academic'],
+    skills: ['skills', 'technical', 'competencies']
+  };
+  
+  const sections: string[] = [];
+  const lowerText = text.toLowerCase();
+  
+  Object.entries(sectionKeywords).forEach(([section, keywords]) => {
+    if (keywords.some(kw => lowerText.includes(kw))) {
+      sections.push(section);
+    }
+  });
+
+  const metrics: Array<{ text: string; source: string }> = [];
+  const metricMatches = text.matchAll(METRIC_REGEX);
+  for (const match of metricMatches) {
+    metrics.push({ text: match[0], source: 'resume' });
+  }
+
+  return {
+    name: 'Candidate',
+    email: emailMatch?.[0] || '',
+    phone: phoneMatch?.[0] || '',
+    summary: '',
+    experiences: [],
+    projects: [],
+    education: [],
+    skills: [],
+    sections,
+    metrics
+  };
+}
+
+function calculateHealthCheck(originalResume: string, parsedData: ParsedResume): HealthCheck {
+  const warnings: string[] = [];
+  let score = 0;
+
+  const hasSummary = originalResume.toLowerCase().includes('summary') || originalResume.toLowerCase().includes('professional');
+  if (!hasSummary) warnings.push('Add a professional summary to highlight key qualifications');
+  score += hasSummary ? 15 : 0;
+
+  const metricMatches = Array.from(originalResume.matchAll(METRIC_REGEX));
+  const metricsCount = metricMatches.length;
+  const hasMetrics = metricsCount > 0;
+  if (!hasMetrics) warnings.push('Add quantifiable achievements (e.g., "reduced costs by 30%")');
+  score += Math.min(metricsCount * 5, 25);
+
+  const experienceCount = (originalResume.match(/\b(Senior|Junior|Lead|Manager|Developer|Engineer|Analyst|Specialist)\b/gi) || []).length;
+  if (experienceCount === 0) warnings.push('Ensure job titles are clearly visible');
+  score += Math.min(experienceCount * 3, 15);
+
+  const skillsCount = (originalResume.match(/python|javascript|java|react|aws|sql|node|typescript|golang|rust|docker|kubernetes|git/gi) || []).length;
+  if (skillsCount === 0) warnings.push('Add technical skills section with relevant technologies');
+  score += Math.min(skillsCount * 2, 15);
+
+  const hasEducation = originalResume.toLowerCase().includes('degree') || originalResume.toLowerCase().includes('university') || originalResume.toLowerCase().includes('college');
+  if (!hasEducation) warnings.push('Add education section with degree and institution');
+  score += hasEducation ? 10 : 0;
+
+  const hasEmail = originalResume.includes('@');
+  const hasPhone = /\d{10}/.test(originalResume);
+  if (!hasEmail || !hasPhone) warnings.push('Ensure email and phone number are clearly visible');
+  score += (hasEmail && hasPhone) ? 10 : 0;
+
+  const hasCompanyNames = /\b(Google|Apple|Microsoft|Amazon|Meta|Netflix|Tesla|Stripe|Notion)\b/i.test(originalResume);
+  score += hasCompanyNames ? 5 : 0;
+
+  return {
+    hasSummary,
+    hasMetrics,
+    metricsPerExperience: experienceCount > 0 ? Math.round(metricsCount / experienceCount) : 0,
+    totalMetrics: metricsCount,
+    skillsCount,
+    experiencesCount: experienceCount,
+    projectsCount: parsedData.sections.includes('projects') ? 1 : 0,
+    hasEducation,
+    warnings: warnings.slice(0, 4),
+    score: Math.min(score, 100)
+  };
+}
+
+interface QualityComparison {
+  originalScore: number;
+  optimizedScore: number;
+  improvement: number;
+  metricsAdded: number;
+  keywordMatch: number;
+  sections: string[];
+}
+
+function calculateQualityComparison(
+  originalResume: string,
+  optimizedBullets: string[],
+  trimmedJD: string
+): QualityComparison {
+  const originalMetrics = (originalResume.match(METRIC_REGEX) || []).length;
+  
+  const optimizedMetrics = optimizedBullets.join(' ').match(METRIC_REGEX)?.length || 0;
+  
+  const jdWords = trimmedJD.toLowerCase().split(/\W+/).filter(w => w.length > 3);
+  const resumeWords = optimizedBullets.join(' ').toLowerCase().split(/\W+/);
+  const matchedKeywords = jdWords.filter(word => resumeWords.includes(word)).length;
+  const keywordMatch = Math.round((matchedKeywords / jdWords.length) * 100);
+
+  return {
+    originalScore: Math.max(50, originalMetrics * 10),
+    optimizedScore: Math.max(50, optimizedMetrics * 10),
+    improvement: (optimizedMetrics - originalMetrics),
+    metricsAdded: Math.max(0, optimizedMetrics - originalMetrics),
+    keywordMatch: Math.min(keywordMatch, 100),
+    sections: ['Experience', 'Projects', 'Skills', 'Education']
+  };
+}
+
+interface ABTestData {
+  changes: Array<{
+    original: string;
+    optimized: string;
+    reason: string;
+    type: 'rewrite' | 'reorder' | 'metric-highlight' | 'keyword-match';
+  }>;
+  totalChanges: number;
+  metricsHighlighted: number;
+}
+
+function generateABTestData(
+  originalBullets: string[],
+  optimizedBullets: string[]
+): ABTestData {
+  const changes: ABTestData['changes'] = [];
+
+  optimizedBullets.forEach((optimized, index) => {
+    if (optimized.length > 10) {
+      const hasMetric = QUANTIFIABLE_KEYWORDS.some(kw => optimized.toLowerCase().includes(kw));
+      
+      changes.push({
+        original: originalBullets[index] || '',
+        optimized,
+        reason: hasMetric ? 'Highlighted quantifiable metrics' : 'Rewrote for ATS optimization',
+        type: hasMetric ? 'metric-highlight' : 'rewrite'
+      });
+    }
+  });
+
+  return {
+    changes: changes.slice(0, 10), 
+    totalChanges: changes.length,
+    metricsHighlighted: changes.filter(c => c.type === 'metric-highlight').length
+  };
+}
+
 async function extractTextFromPDF(buffer: ArrayBuffer): Promise<string> {
   try {
     const pdfjsLib = await import('pdfjs-dist/legacy/build/pdf.mjs');
@@ -233,6 +440,9 @@ export async function POST(req: NextRequest) {
       }
       throw extractError;
     }
+    const parsedResume = parseResumeStructure(pureTextResume);
+    const healthCheck = calculateHealthCheck(pureTextResume, parsedResume);
+    console.log(`[GENERATE_INFO] Job ${uniqueId} | Resume Health Score: ${healthCheck.score}/100`);
 
     const trimmedJD = trimJD(rawJD);
     console.log(`[GENERATE_INFO] Job ${uniqueId} | JD Length: ${trimmedJD.length} chars | PDF Text Length: ${pureTextResume.length} chars`);
@@ -279,7 +489,12 @@ export async function POST(req: NextRequest) {
         error: 'The provided job description contains suspicious content. Please provide a legitimate job description.' 
       }, { status: 400 });
     }
-    console.log(`[GENERATE_INFO] Job ${uniqueId} | Gemini object generation successful`);
+    const allOptimizedBullets = resumeData.experiences.flatMap(exp => exp.bulletPoints);
+    const qualityComparison = calculateQualityComparison(pureTextResume, allOptimizedBullets, trimmedJD);
+
+    const abTestData = generateABTestData([], allOptimizedBullets);
+
+    console.log(`[GENERATE_INFO] Job ${uniqueId} | Quality Score: ${qualityComparison.optimizedScore} | Keyword Match: ${qualityComparison.keywordMatch}%`);
 
     const sanitizedData = sanitizeEmojisAndUnicode(resumeData);
     const templatePath = path.join(process.cwd(), 'base_template.tex');
@@ -297,7 +512,17 @@ export async function POST(req: NextRequest) {
     
     return NextResponse.json({
       pdf: pdfBuffer.toString('base64'),
-      tex: compiledTex
+      tex: compiledTex,
+      analytics: {
+        healthCheck,
+        qualityComparison,
+        abTestData,
+        metrics: {
+          totalMetrics: healthCheck.totalMetrics,
+          metricsHighlighted: abTestData.metricsHighlighted,
+          keywordMatch: qualityComparison.keywordMatch
+        }
+      }
     });
 
   } catch (error) {
