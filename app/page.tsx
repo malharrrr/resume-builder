@@ -1,29 +1,32 @@
 'use client';
 import { useState } from 'react';
 
+interface ATSScores {
+  overallScore: number;
+  semanticSimilarity: number;
+  keywordCoverage: number;
+  formatReadiness: number;
+  skillsMatch: number;
+  breakdown: {
+    jdKeywords: string[];
+    matchedKeywords: string[];
+    missingKeywords: string[];
+  };
+}
+
 interface Analytics {
-  healthCheck: {
+  atsScores: ATSScores;
+  resumeHealth: {
     score: number;
-    totalMetrics: number;
-    metricsPerExperience: number;
-    warnings: string[];
-    skillsCount: number;
-    experiencesCount: number;
+    metrics: number;
+    sections: number;
+    formatting: number;
+    content: number;
   };
-  qualityComparison: {
-    originalScore: number;
-    optimizedScore: number;
+  improvement: {
+    beforeATS: number;
+    afterATS: number;
     improvement: number;
-    keywordMatch: number;
-  };
-  abTestData: {
-    totalChanges: number;
-    metricsHighlighted: number;
-  };
-  metrics: {
-    totalMetrics: number;
-    metricsHighlighted: number;
-    keywordMatch: number;
   };
 }
 
@@ -181,13 +184,25 @@ export default function ResumeBuilder() {
     URL.revokeObjectURL(url);
   };
 
+  const getScoreColor = (score: number) => {
+    if (score >= 80) return 'text-green-400';
+    if (score >= 60) return 'text-yellow-400';
+    return 'text-orange-400';
+  };
+
+  const getScoreBgColor = (score: number) => {
+    if (score >= 80) return 'bg-green-900/20';
+    if (score >= 60) return 'bg-yellow-900/20';
+    return 'bg-orange-900/20';
+  };
+
   return (
     <div className="flex flex-col lg:flex-row min-h-[100dvh] h-[100dvh] w-full bg-zinc-950 text-zinc-300 font-sans selection:bg-white selection:text-black overflow-hidden">
       <div className={`w-full lg:w-1/2 flex-col p-6 sm:p-8 lg:p-12 border-b lg:border-b-0 lg:border-r border-zinc-800 overflow-y-auto shrink-0 h-full ${pdfUrl ? 'hidden lg:flex' : 'flex'}`}>
         
         <div className="mb-6 sm:mb-10">
           <h1 className="text-2xl sm:text-3xl font-medium text-white tracking-tight">Resume OS</h1>
-          <p className="text-xs sm:text-sm text-zinc-500 mt-2">Dynamic ATS optimization with analytics.</p>
+          <p className="text-xs sm:text-sm text-zinc-500 mt-2">Dynamic ATS optimization with AI-powered analysis.</p>
         </div>
         
         <div className="space-y-6 sm:space-y-8 flex-grow">
@@ -235,7 +250,7 @@ export default function ResumeBuilder() {
             {isGenerating ? (
               <>
                 <svg className="animate-spin h-4 w-4 text-zinc-900" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>
-                Compiling...
+                Analyzing & Compiling...
               </>
             ) : 'Generate Tailored Resume'}
           </button>
@@ -248,14 +263,14 @@ export default function ResumeBuilder() {
           <>
             <div className="hidden lg:flex flex-col w-full h-full max-h-full">
               <div className="flex justify-between items-center mb-4 flex-wrap gap-2">
-                <span className="text-sm font-medium text-zinc-400">Preview Generation Complete</span>
+                <span className="text-sm font-medium text-zinc-400">ATS Analysis Complete</span>
                 <div className="flex items-center gap-2 flex-wrap">
                   {analytics && (
                     <button 
                       onClick={() => setShowAnalytics(!showAnalytics)}
                       className="flex items-center gap-2 px-3 py-1.5 text-xs font-semibold text-white bg-blue-900 border border-blue-700 rounded hover:bg-blue-800 transition-colors"
                     >
-                      {showAnalytics ? 'Hide' : 'Show'} Analytics
+                      {showAnalytics ? 'Hide' : 'Show'} Analysis
                     </button>
                   )}
                   <button onClick={downloadPdf} className="flex items-center gap-2 px-3 py-1.5 text-xs font-semibold text-white bg-zinc-900 border border-zinc-800 rounded hover:bg-zinc-800 transition-colors">
@@ -271,70 +286,92 @@ export default function ResumeBuilder() {
                 <div className="w-full flex-grow rounded-md overflow-hidden bg-zinc-900 border border-zinc-800 p-4 mb-4 overflow-y-auto max-h-96">
                   <div className="space-y-4">
                     <div>
-                      <h3 className="text-sm font-semibold text-white mb-3">Resume Quality Metrics</h3>
+                      <h3 className="text-sm font-semibold text-white mb-3">ATS Score Analysis</h3>
                       
+                      <div className={`${getScoreBgColor(analytics.atsScores.overallScore)} rounded-lg p-4 mb-4 border border-zinc-700`}>
+                        <p className="text-xs text-zinc-400 mb-2">Overall ATS Score</p>
+                        <p className={`text-4xl font-bold ${getScoreColor(analytics.atsScores.overallScore)}`}>
+                          {analytics.atsScores.overallScore}
+                        </p>
+                      </div>
+
                       <div className="grid grid-cols-2 gap-3 mb-4">
                         <div className="bg-zinc-800 rounded p-3">
-                          <p className="text-xs text-zinc-400 mb-1">ATS Score</p>
-                          <p className="text-2xl font-bold text-white">{analytics.metrics.keywordMatch}%</p>
-                          <p className="text-xs text-zinc-500">Keyword match</p>
+                          <p className="text-xs text-zinc-400 mb-1">Keyword Coverage</p>
+                          <p className={`text-2xl font-bold ${getScoreColor(analytics.atsScores.keywordCoverage)}`}>
+                            {analytics.atsScores.keywordCoverage}%
+                          </p>
+                          <p className="text-xs text-zinc-500">JD keywords matched</p>
                         </div>
 
                         <div className="bg-zinc-800 rounded p-3">
-                          <p className="text-xs text-zinc-400 mb-1">Quantified Achievements</p>
-                          <p className="text-2xl font-bold text-white">{analytics.healthCheck.totalMetrics}</p>
-                          <p className="text-xs text-zinc-500">Total metrics found</p>
+                          <p className="text-xs text-zinc-400 mb-1">Format Readiness</p>
+                          <p className={`text-2xl font-bold ${getScoreColor(analytics.atsScores.formatReadiness)}`}>
+                            {analytics.atsScores.formatReadiness}%
+                          </p>
+                          <p className="text-xs text-zinc-500">ATS parseability</p>
                         </div>
 
                         <div className="bg-zinc-800 rounded p-3">
-                          <p className="text-xs text-zinc-400 mb-1">Quality Improvement</p>
-                          <p className="text-2xl font-bold text-green-400">+{analytics.qualityComparison.improvement}</p>
-                          <p className="text-xs text-zinc-500">Metrics added</p>
+                          <p className="text-xs text-zinc-400 mb-1">Semantic Match</p>
+                          <p className={`text-2xl font-bold ${getScoreColor(analytics.atsScores.semanticSimilarity)}`}>
+                            {analytics.atsScores.semanticSimilarity}%
+                          </p>
+                          <p className="text-xs text-zinc-500">Concept alignment</p>
                         </div>
 
                         <div className="bg-zinc-800 rounded p-3">
-                          <p className="text-xs text-zinc-400 mb-1">Technical Skills</p>
-                          <p className="text-2xl font-bold text-white">{analytics.healthCheck.skillsCount}</p>
-                          <p className="text-xs text-zinc-500">Detected</p>
+                          <p className="text-xs text-zinc-400 mb-1">Skills Match</p>
+                          <p className={`text-2xl font-bold ${getScoreColor(analytics.atsScores.skillsMatch)}`}>
+                            {analytics.atsScores.skillsMatch}%
+                          </p>
+                          <p className="text-xs text-zinc-500">Technical overlap</p>
                         </div>
                       </div>
 
-                      {analytics.healthCheck.warnings.length > 0 && (
-                        <div className="bg-amber-900/20 border border-amber-700 rounded p-3 mb-3">
-                          <p className="text-xs font-semibold text-amber-200 mb-2">Improvement Tips:</p>
-                          <ul className="text-xs text-amber-100 space-y-1">
-                            {analytics.healthCheck.warnings.map((warning, idx) => (
-                              <li key={idx} className="flex gap-2">
-                                <span>•</span>
-                                <span>{warning}</span>
-                              </li>
+                      <div className="bg-green-900/20 border border-green-700 rounded p-3 mb-4">
+                        <p className="text-xs font-semibold text-green-200 mb-2">ATS Improvement</p>
+                        <div className="flex justify-between text-xs">
+                          <div>
+                            <p className="text-zinc-400">Baseline</p>
+                            <p className="font-bold text-white">{analytics.improvement.beforeATS}</p>
+                          </div>
+                          <div className="text-center">
+                            <p className="text-green-400 font-bold">+{analytics.improvement.improvement}</p>
+                          </div>
+                          <div>
+                            <p className="text-zinc-400">Optimized</p>
+                            <p className="font-bold text-green-400">{analytics.improvement.afterATS}</p>
+                          </div>
+                        </div>
+                      </div>
+
+                      {analytics.atsScores.breakdown.matchedKeywords.length > 0 && (
+                        <div className="bg-zinc-800 rounded p-3 border border-zinc-700">
+                          <p className="text-xs font-semibold text-white mb-2">Matched Keywords ({analytics.atsScores.breakdown.matchedKeywords.length})</p>
+                          <div className="flex flex-wrap gap-1">
+                            {analytics.atsScores.breakdown.matchedKeywords.slice(0, 8).map((kw, idx) => (
+                              <span key={idx} className="text-xs bg-green-900/40 text-green-300 px-2 py-1 rounded">
+                                {kw}
+                              </span>
                             ))}
-                          </ul>
+                          </div>
                         </div>
                       )}
-                    </div>
 
-                    <div className="bg-zinc-800 rounded p-3 border border-zinc-700">
-                      <p className="text-xs font-semibold text-white mb-2">A/B Test Summary</p>
-                      <div className="grid grid-cols-2 gap-2 text-xs">
-                        <div>
-                          <p className="text-zinc-400">Bullet Changes</p>
-                          <p className="font-semibold text-white">{analytics.abTestData.totalChanges}</p>
+                      {analytics.atsScores.breakdown.missingKeywords.length > 0 && (
+                        <div className="bg-zinc-800 rounded p-3 border border-zinc-700 mt-3">
+                          <p className="text-xs font-semibold text-white mb-2">Missing Keywords ({analytics.atsScores.breakdown.missingKeywords.length})</p>
+                          <div className="flex flex-wrap gap-1">
+                            {analytics.atsScores.breakdown.missingKeywords.slice(0, 5).map((kw, idx) => (
+                              <span key={idx} className="text-xs bg-orange-900/40 text-orange-300 px-2 py-1 rounded">
+                                {kw}
+                              </span>
+                            ))}
+                          </div>
+                          <p className="text-xs text-zinc-400 mt-2">Consider adding these terms if relevant to your background</p>
                         </div>
-                        <div>
-                          <p className="text-zinc-400">Metrics Highlighted</p>
-                          <p className="font-semibold text-green-400">{analytics.abTestData.metricsHighlighted}</p>
-                        </div>
-                      </div>
-                    </div>
-
-                    <div className="bg-zinc-800 rounded p-3 border border-zinc-700">
-                      <p className="text-xs font-semibold text-white mb-2">Metric Categories</p>
-                      <div className="text-xs text-zinc-300 space-y-1">
-                        <p>✓ Quantified achievements extracted and highlighted</p>
-                        <p>✓ {analytics.metrics.totalMetrics} metrics preserved in final resume</p>
-                        <p>✓ All numbers and percentages preserved exactly</p>
-                      </div>
+                      )}
                     </div>
                   </div>
                 </div>
@@ -355,21 +392,25 @@ export default function ResumeBuilder() {
               <div className="text-center space-y-2">
                 <h2 className="text-2xl font-bold text-white tracking-tight">Resume Ready!</h2>
                 <p className="text-sm text-zinc-400 max-w-[250px] mx-auto">
-                  Your ATS-optimized resume has been compiled successfully.
+                  Your ATS-optimized resume has been analyzed and compiled.
                 </p>
               </div>
 
               {analytics && (
                 <div className="w-full max-w-sm bg-zinc-900 rounded-lg p-4 border border-zinc-800 mb-4">
-                  <p className="text-xs font-semibold text-white mb-3">Quick Stats</p>
+                  <p className="text-xs font-semibold text-white mb-3">ATS Score</p>
                   <div className="grid grid-cols-2 gap-2 text-xs">
                     <div>
-                      <p className="text-zinc-400">ATS Match</p>
-                      <p className="font-bold text-white">{analytics.metrics.keywordMatch}%</p>
+                      <p className="text-zinc-400">Overall</p>
+                      <p className={`text-2xl font-bold ${getScoreColor(analytics.atsScores.overallScore)}`}>
+                        {analytics.atsScores.overallScore}
+                      </p>
                     </div>
                     <div>
-                      <p className="text-zinc-400">Metrics</p>
-                      <p className="font-bold text-green-400">+{analytics.qualityComparison.improvement}</p>
+                      <p className="text-zinc-400">Improvement</p>
+                      <p className="text-2xl font-bold text-green-400">
+                        +{analytics.improvement.improvement}
+                      </p>
                     </div>
                   </div>
                 </div>
@@ -400,7 +441,7 @@ export default function ResumeBuilder() {
               <line x1="16" y1="17" x2="8" y2="17"></line>
               <polyline points="10 9 9 9 8 9"></polyline>
             </svg>
-            <p className="text-sm font-medium">Output will be rendered here</p>
+            <p className="text-sm font-medium">Upload your resume to begin</p>
           </div>
         )}
       </div>
