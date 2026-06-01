@@ -206,59 +206,98 @@ async function extractTextFromPDF(buffer: ArrayBuffer): Promise<string> {
     pdfjsLib.GlobalWorkerOptions.workerSrc = 'pdfjs-dist/legacy/build/pdf.worker.mjs';
     const loadingTask = pdfjsLib.getDocument({ data: new Uint8Array(buffer) });
     const pdf = await loadingTask.promise;
-    
+
     let totalText = '';
-    
+
     for (let i = 1; i <= pdf.numPages; i++) {
       const page = await pdf.getPage(i);
       const content = await page.getTextContent();
-      
+
       if (content.items.length === 0 && i === 1) {
         throw new Error('INVALID_PDF_FORMAT_SCAN');
       }
-      
+
       const pageText = content.items.map((item: any) => item.str).join(' ');
       totalText += pageText + '\n';
     }
-    
+
     if (totalText.trim().length < 50) {
       throw new Error('INVALID_PDF_FORMAT_SCAN');
     }
-    
+
     return totalText;
   } catch (error: any) {
-    if (error.message === 'INVALID_PDF_FORMAT_SCAN') {
-      throw new Error('INVALID_PDF_FORMAT_SCAN');
-    }
-    if (error.message && (error.message.includes('PDF') || error.message.includes('pdf'))) {
-      throw new Error('CORRUPTED_PDF');
-    }
+    if (error.message === 'INVALID_PDF_FORMAT_SCAN') throw new Error('INVALID_PDF_FORMAT_SCAN');
+    if (error.message?.includes('PDF') || error.message?.includes('pdf')) throw new Error('CORRUPTED_PDF');
     throw error;
   }
 }
 
-function trimJD(jd: string) {
-  const boilerplateMarkers = ["equal opportunity", "benefits", "what we offer", "about us", "perks"];
+function trimJD(jd: string): string {
+  const CHAR_LIMIT = 4000;
+  const boilerplateMarkers = [
+    "equal opportunity",
+    "eeo statement",
+    "benefits",
+    "what we offer",
+    "perks and benefits",
+    "about us",
+    "who we are",
+    "our story",
+    "compensation",
+    "salary range",
+    "401k",
+    "health insurance",
+    "dental",
+    "vision",
+    "pto",
+    "paid time off",
+    "remote work policy",
+    "diversity",
+    "inclusion",
+  ];
+
   let trimmed = jd;
+  const lower = trimmed.toLowerCase();
+
+  let cutAt = trimmed.length;
   for (const marker of boilerplateMarkers) {
-    const idx = trimmed.toLowerCase().indexOf(marker);
-    if (idx > -1) trimmed = trimmed.substring(0, idx);
+    const idx = lower.indexOf(marker);
+    if (idx > 200 && idx < cutAt) cutAt = idx; 
   }
-  return trimmed.slice(0, 4000); 
+  trimmed = trimmed.substring(0, cutAt);
+
+  trimmed = trimmed
+    .split('\n')
+    .map(line => line.trim())
+    .filter((line, i, arr) => !(line === '' && arr[i - 1] === ''))
+    .join('\n')
+    .trim();
+
+  if (trimmed.length > CHAR_LIMIT) {
+    const slice = trimmed.substring(0, CHAR_LIMIT);
+    const lastSentenceEnd = Math.max(
+      slice.lastIndexOf('. '),
+      slice.lastIndexOf('.\n'),
+      slice.lastIndexOf('! '),
+      slice.lastIndexOf('? '),
+    );
+    trimmed = lastSentenceEnd > CHAR_LIMIT * 0.5
+      ? trimmed.substring(0, lastSentenceEnd + 1).trim()
+      : slice.trim();
+  }
+
+  return trimmed;
 }
 
 function sanitizeEmojisAndUnicode(obj: any): any {
   if (typeof obj === 'string') {
     return obj.replace(/[\p{Emoji_Presentation}\p{Extended_Pictographic}]/gu, '');
   }
-  if (Array.isArray(obj)) {
-    return obj.map(sanitizeEmojisAndUnicode);
-  }
+  if (Array.isArray(obj)) return obj.map(sanitizeEmojisAndUnicode);
   if (typeof obj === 'object' && obj !== null) {
     const sanitized: any = {};
-    for (const key in obj) {
-      sanitized[key] = sanitizeEmojisAndUnicode(obj[key]);
-    }
+    for (const key in obj) sanitized[key] = sanitizeEmojisAndUnicode(obj[key]);
     return sanitized;
   }
   return obj;
@@ -282,89 +321,80 @@ export async function POST(req: NextRequest) {
     }
 
     if (resumeFile.size > 5 * 1024 * 1024) {
-      console.warn(`[GENERATE_WARN] Job ${uniqueId} rejected: File size ${resumeFile.size} bytes exceeds 5MB limit`);
-      return NextResponse.json({ 
-        error: 'Resume file exceeds 5MB limit. Please reduce file size and try again.' 
-      }, { status: 400 });
+      console.warn(`[GENERATE_WARN] Job ${uniqueId} rejected: File too large`);
+      return NextResponse.json({ error: 'Resume file exceeds 5MB limit. Please reduce file size and try again.' }, { status: 400 });
     }
 
-    if (!rawJD || rawJD.trim().length < 100) {
-      console.warn(`[GENERATE_WARN] Job ${uniqueId} rejected: JD too short (${rawJD.trim().length} chars)`);
-      return NextResponse.json({ 
-        error: 'Job description is empty or invalid. Please provide a complete job description.' 
-      }, { status: 400 });
+    if (rawJD.trim().length < 100) {
+      console.warn(`[GENERATE_WARN] Job ${uniqueId} rejected: JD too short`);
+      return NextResponse.json({ error: 'Job description is empty or invalid. Please provide a complete job description.' }, { status: 400 });
     }
 
-    let fileBuffer: ArrayBuffer;
     let pureTextResume: string;
-
     try {
-      fileBuffer = await resumeFile.arrayBuffer();
+      const fileBuffer = await resumeFile.arrayBuffer();
       pureTextResume = await extractTextFromPDF(fileBuffer);
     } catch (extractError: any) {
-      console.warn(`[GENERATE_WARN] Job ${uniqueId} rejected: PDF extraction error - ${extractError.message}`);
-      
+      console.warn(`[GENERATE_WARN] Job ${uniqueId}: PDF error - ${extractError.message}`);
       if (extractError.message === 'INVALID_PDF_FORMAT_SCAN') {
-        return NextResponse.json({ 
-          error: 'Invalid resume format: PDF appears to be a scan or image. Please upload a text-based PDF.' 
-        }, { status: 400 });
+        return NextResponse.json({ error: 'Invalid resume format: PDF appears to be a scan or image. Please upload a text-based PDF.' }, { status: 400 });
       }
       if (extractError.message === 'CORRUPTED_PDF') {
-        return NextResponse.json({ 
-          error: 'Invalid resume format: Corrupted PDF file.' 
-        }, { status: 400 });
+        return NextResponse.json({ error: 'Invalid resume format: Corrupted PDF file.' }, { status: 400 });
       }
       throw extractError;
     }
 
     const trimmedJD = trimJD(rawJD);
-    const resumeHealthScore = calculateResumeHealthScore(pureTextResume);
-    console.log(`[GENERATE_INFO] Job ${uniqueId} | Resume Health Score: ${resumeHealthScore.score}/100`);
+    console.log(`[GENERATE_INFO] Job ${uniqueId} | JD: ${trimmedJD.length} chars | Resume: ${pureTextResume.length} chars`);
 
-    console.log(`[GENERATE_INFO] Job ${uniqueId} | JD Length: ${trimmedJD.length} chars | PDF Text Length: ${pureTextResume.length} chars`);
-
-    const { object: resumeData } = await generateObject({
-      model: google('gemini-3.1-flash-lite'),
-      schema: z.object({
-        name: z.string(),
-        github_username: z.string().optional(),
-        linkedin_username: z.string().optional(),
-        email: z.string(),
-        phone: z.string(),
-        website: z.string().optional(),
-        website_display: z.string().optional(),
-        summary: z.string(),
-        experiences: z.array(z.object({
-          title: z.string(),
-          dates: z.string(),
-          bulletPoints: z.array(z.string())
-        })),
-        projects: z.array(z.object({
+    const [{ object: resumeData }, resumeHealthScore] = await Promise.all([
+      generateObject({
+        model: google('gemini-3.1-flash-lite'),
+        schema: z.object({
           name: z.string(),
-          link: z.string(),
-          link_text: z.string(),
-          description: z.string()
-        })),
-        education: z.array(z.object({
-          years: z.string(),
-          degree: z.string(),
-          institution: z.string(),
-          gpa: z.string()
-        })),
-        skills: z.array(z.object({
-          category: z.string(),
-          items: z.string()
-        }))
+          github_username: z.string().optional(),
+          linkedin_username: z.string().optional(),
+          email: z.string(),
+          phone: z.string(),
+          website: z.string().optional(),
+          website_display: z.string().optional(),
+          summary: z.string(),
+          experiences: z.array(z.object({
+            title: z.string(),
+            dates: z.string(),
+            bulletPoints: z.array(z.string())
+          })),
+          projects: z.array(z.object({
+            name: z.string(),
+            link: z.string(),
+            link_text: z.string(),
+            description: z.string()
+          })),
+          education: z.array(z.object({
+            years: z.string(),
+            degree: z.string(),
+            institution: z.string(),
+            gpa: z.string()
+          })),
+          skills: z.array(z.object({
+            category: z.string(),
+            items: z.string()
+          }))
+        }),
+        prompt: getSystemPrompt(trimmedJD, pureTextResume)
       }),
-      prompt: getSystemPrompt(trimmedJD, pureTextResume)
-    });
+      Promise.resolve(calculateResumeHealthScore(pureTextResume))
+    ]);
 
     if (resumeData.name === 'INVALID_JD') {
-      console.warn(`[GENERATE_SECURITY] Job ${uniqueId} rejected: Malicious JD detected`);
-      return NextResponse.json({ 
-        error: 'The provided job description contains suspicious content. Please provide a legitimate job description.' 
-      }, { status: 400 });
+      console.warn(`[GENERATE_SECURITY] Job ${uniqueId}: Malicious JD detected`);
+      return NextResponse.json({ error: 'The provided job description contains suspicious content. Please provide a legitimate job description.' }, { status: 400 });
     }
+
+    console.log(`[GENERATE_INFO] Job ${uniqueId} | AI generation successful`);
+
+    const sanitizedData = sanitizeEmojisAndUnicode(resumeData);
 
     const optimizedResumeText = [
       resumeData.summary,
@@ -373,10 +403,6 @@ export async function POST(req: NextRequest) {
       resumeData.skills.map(s => s.items).join(' ')
     ].join(' ');
 
-    const atsScores = calculateATSScore(optimizedResumeText, trimmedJD);
-    console.log(`[GENERATE_INFO] Job ${uniqueId} | ATS Score: ${atsScores.overallScore}/100 | Keyword Coverage: ${atsScores.keywordCoverage}% | Format: ${atsScores.formatReadiness}%`);
-
-    const sanitizedData = sanitizeEmojisAndUnicode(resumeData);
     const templatePath = path.join(process.cwd(), 'base_template.tex');
     const baseTemplate = await fs.readFile(templatePath, 'utf-8');
     const template = Handlebars.compile(baseTemplate);
@@ -384,12 +410,17 @@ export async function POST(req: NextRequest) {
 
     await fs.mkdir(tempDir, { recursive: true });
     await fs.writeFile(texPath, compiledTex);
-    console.log(`[GENERATE_INFO] Job ${uniqueId} | Starting pdflatex compilation`);
-    await execAsync(`pdflatex -interaction=nonstopmode -output-directory=${tempDir} ${texPath}`);
 
-    const pdfBuffer = await fs.readFile(pdfPath);
-    console.log(`[GENERATE_SUCCESS] Job ${uniqueId} | Sending response`);
-    
+    console.log(`[GENERATE_INFO] Job ${uniqueId} | Starting parallel: pdflatex + ATS scoring`);
+
+    const [pdfBuffer, atsScores] = await Promise.all([
+      execAsync(`pdflatex -interaction=nonstopmode -output-directory=${tempDir} ${texPath}`)
+        .then(() => fs.readFile(pdfPath)),
+      Promise.resolve(calculateATSScore(optimizedResumeText, trimmedJD))
+    ]);
+
+    console.log(`[GENERATE_SUCCESS] Job ${uniqueId} | ATS: ${atsScores.overallScore}/100 | Health: ${resumeHealthScore.score}/100`);
+
     return NextResponse.json({
       pdf: pdfBuffer.toString('base64'),
       tex: compiledTex,
