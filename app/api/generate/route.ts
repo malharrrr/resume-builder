@@ -9,6 +9,8 @@ import fs from 'fs/promises';
 import path from 'path';
 import crypto from 'crypto';
 import { calculateATSScore, calculateResumeHealthScore } from '../ats_scoring_system';
+import * as pdfjsLib from 'pdfjs-dist/legacy/build/pdf.mjs';
+pdfjsLib.GlobalWorkerOptions.workerSrc = 'pdfjs-dist/legacy/build/pdf.worker.mjs';
 
 if (typeof globalThis.DOMMatrix === 'undefined') {
   (globalThis as any).DOMMatrix = class DOMMatrix {};
@@ -202,8 +204,6 @@ ${pureTextResume}`;
 
 async function extractTextFromPDF(buffer: ArrayBuffer): Promise<string> {
   try {
-    const pdfjsLib = await import('pdfjs-dist/legacy/build/pdf.mjs');
-    pdfjsLib.GlobalWorkerOptions.workerSrc = 'pdfjs-dist/legacy/build/pdf.worker.mjs';
     const loadingTask = pdfjsLib.getDocument({ data: new Uint8Array(buffer) });
     const pdf = await loadingTask.promise;
 
@@ -353,7 +353,7 @@ export async function POST(req: NextRequest) {
 
     const [{ object: resumeData }, resumeHealthScore] = await Promise.all([
       generateObject({
-        model: google('gemini-3.1-flash-lite'),
+        model: google('gemini-2.5-flash'),
         schema: z.object({
           name: z.string(),
           github_username: z.string().optional(),
@@ -417,7 +417,7 @@ export async function POST(req: NextRequest) {
     console.log(`[GENERATE_INFO] Job ${uniqueId} | Starting parallel: pdflatex + ATS scoring`);
 
     const [pdfBuffer, atsScores] = await Promise.all([
-      execAsync(`pdflatex -interaction=nonstopmode -output-directory=${tempDir} ${texPath}`)
+      execAsync(`pdflatex -interaction=nonstopmode -halt-on-error --synctex=0 -output-directory=${tempDir} ${texPath}`)
         .then(() => fs.readFile(pdfPath)),
       Promise.resolve(calculateATSScore(optimizedResumeText, trimmedJD))
     ]);
