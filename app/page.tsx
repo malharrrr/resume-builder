@@ -94,7 +94,8 @@ export default function ResumeBuilder() {
       const formData = new FormData();
       formData.append('resume', resumeFile);
       formData.append('jobDescription', jd);
-
+      
+      const generateStartTime = performance.now();
       const response = await fetch('/api/generate', {
         method: 'POST',
         body: formData,
@@ -126,6 +127,8 @@ export default function ResumeBuilder() {
       }
       
       logUserAction('GENERATE_SUCCESS');
+      logUserAction('GENERATE_SUCCESS');
+      logUserAction('GENERATE_COMPLETE', { totalTimeMs: Math.round(performance.now() - generateStartTime) });
 
     } catch (err: any) {
       console.error(err);
