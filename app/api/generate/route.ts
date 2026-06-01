@@ -353,7 +353,7 @@ export async function POST(req: NextRequest) {
 
     const [{ object: resumeData }, resumeHealthScore] = await Promise.all([
       generateObject({
-        model: google('gemini-2.5-flash'),
+        model: google('gemini-3.5-flash'),
         schema: z.object({
           name: z.string(),
           github_username: z.string().optional(),
