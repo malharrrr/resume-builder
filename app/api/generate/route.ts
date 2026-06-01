@@ -263,7 +263,10 @@ function trimJD(jd: string): string {
   let cutAt = trimmed.length;
   for (const marker of boilerplateMarkers) {
     const idx = lower.indexOf(marker);
-    if (idx > 200 && idx < cutAt) cutAt = idx; 
+    if (idx > 200 && idx < cutAt) {
+      const lineStart = trimmed.lastIndexOf('\n', idx);
+      cutAt = lineStart > 0 ? lineStart : idx;
+    }
   }
   trimmed = trimmed.substring(0, cutAt);
 
