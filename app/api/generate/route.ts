@@ -9,12 +9,7 @@ import fs from 'fs/promises';
 import path from 'path';
 import crypto from 'crypto';
 import { calculateATSScore, calculateResumeHealthScore } from '../ats_scoring_system';
-import * as pdfjsLib from 'pdfjs-dist/legacy/build/pdf.mjs';
-pdfjsLib.GlobalWorkerOptions.workerSrc = 'pdfjs-dist/legacy/build/pdf.worker.mjs';
-
-if (typeof globalThis.DOMMatrix === 'undefined') {
-  (globalThis as any).DOMMatrix = class DOMMatrix {};
-}
+import { pdfjsLib } from '../pdf-loader';
 
 Handlebars.Utils.escapeExpression = function (text: any) {
   if (typeof text !== 'string') return text;
@@ -387,7 +382,7 @@ export async function POST(req: NextRequest) {
         }),
         prompt: getSystemPrompt(trimmedJD, pureTextResume)
       }),
-      Promise.resolve(calculateResumeHealthScore(pureTextResume))
+      (calculateResumeHealthScore(pureTextResume))
     ]);
 
     if (resumeData.name === 'INVALID_JD') {
