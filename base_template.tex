@@ -58,7 +58,13 @@
 {{#if linkedin_username}}\href{https://linkedin.com/in/{{{linkedin_username}}} }{\raisebox{-0.05\height}\faLinkedin\ {{linkedin_username}} } \ $|$ \ {{/if}}
 {{#if phone}}\href{tel:{{{phone}}} }{\raisebox{-0.05\height}\faPhone\ {{phone}} } \ $|$ \ {{/if}}
 {{#if email}}\href{mailto:{{{email}}} }{\raisebox{-0.05\height}\faEnvelope\ {{email}} } \ $|$ \ {{/if}}
-{{#if website}}\href{ {{{website}}} }{\raisebox{-0.05\height}\faGlobe\ {{website_display}} }{{/if}} \\
+{{#if website}}
+  \href{ {{{website}}} }{\raisebox{-0.05\height}\faGlobe\ {{#if website_display}}{{website_display}}{{else}}Portfolio{{/if}} }
+{{else}}
+  {{#if portfolio}}
+    \href{ {{{portfolio}}} }{\raisebox{-0.05\height}\faGlobe\ {{#if portfolio_display}}{{portfolio_display}}{{else}}Portfolio{{/if}} }
+  {{/if}}
+{{/if}} \\
 \end{tabularx}
 
 {{#if summary}}
@@ -93,7 +99,7 @@
 
 \section{Projects}
 {{#each projects}}
-\begin{project}{ {{name}} }{\href{ {{{link}}} }{ {{link_text}} }}{}
+\begin{project}{ {{name}} }{ {{#if link}}\href{ {{{link}}} }{ {{#if link_text}}{{link_text}}{{else}}Link{{/if}} }{{/if}} }{}
 {{#each bulletPoints}}
   \item {{this}}
 {{/each}}
