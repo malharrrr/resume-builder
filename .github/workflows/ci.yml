@@ -1,8 +1,5 @@
 name: CI/CD Pipeline
 
-permissions:
-  contents: read
-
 on:
   pull_request:
   push:
@@ -19,6 +16,17 @@ jobs:
         uses: oven-sh/setup-bun@v2
         with:
           bun-version: latest
+
+      - name: Next.js & Bun Cache Setup
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.bun/install/cache
+            ${{ github.workspace }}/.next/cache
+          key: ${{ runner.os }}-nextjs-bun-${{ hashFiles('**/bun.lock') }}-${{ hashFiles('**/*.js', '**/*.jsx', '**/*.ts', '**/*.tsx') }}
+          restore-keys: |
+            ${{ runner.os }}-nextjs-bun-${{ hashFiles('**/bun.lock') }}-
+            ${{ runner.os }}-nextjs-bun-
 
       - name: Install dependencies
         run: bun install --frozen-lockfile
