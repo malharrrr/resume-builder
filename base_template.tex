@@ -63,7 +63,7 @@
 
 {{#if summary}}
 \section{Profile}
-{{{summary}}}
+{{summary}}
 {{/if}}
 
 \section{Education}
@@ -77,7 +77,7 @@
 {{#each experiences}}
 \begin{joblong}{ {{title}} }{ {{dates}} }
 {{#each bulletPoints}}
-\item {{{this}}}
+\item {{this}}
 {{/each}}
 \end{joblong}
 {{/each}}
@@ -86,10 +86,10 @@
 {{#each projects}}
 \begin{project}{ {{name}} }{\href{ {{{link}}} }{ {{link_text}} }}{}
 {{#each bulletPoints}}
-  \item {{{this}}}
+  \item {{this}}
 {{/each}}
 {{#if description}}
-  \item {{{description}}}
+  \item {{description}}
 {{/if}}
 \end{project}
 {{/each}}
@@ -97,7 +97,7 @@
 \section{Skills}
 \begin{tabularx}{\linewidth}{@{}l X@{}}
 {{#each skills}}
-\textbf{ {{category}} } & {{{items}}} \\
+\textbf{ {{category}} } & {{items}} \\
 {{/each}}
 \end{tabularx}
 
