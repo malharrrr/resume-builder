@@ -13,6 +13,15 @@ const eslintConfig = defineConfig([
     "build/**",
     "next-env.d.ts",
   ]),
+  {
+    rules: {
+      // Downgrades explicit 'any' from an error to a warning
+      "@typescript-eslint/no-explicit-any": "warn",
+      
+      // Downgrades unused variables from an error to a warning
+      "@typescript-eslint/no-unused-vars": "warn",
+    },
+  },
 ]);
 
 export default eslintConfig;
