@@ -27,7 +27,7 @@ jobs:
         run: bun run build
 
       - name: Deploy
-        if: github.ref == 'refs/heads/testing' && github.event_name == 'push'
+        if: github.ref == 'refs/heads/main' && github.event_name == 'push'
         env:
           deploy_url: ${{ secrets.RENDER_DEPLOY_HOOK_URL }}
         run: |

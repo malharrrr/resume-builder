@@ -1,13 +1,29 @@
-\documentclass[a4paper,12pt]{article}
+\documentclass[a4paper,10pt]{article}
 
 \usepackage{url}
-\usepackage{parskip} 	
+\usepackage{parskip}
+\setlength{\parskip}{0pt}
+\setlength{\parindent}{0pt}
 \RequirePackage{color}
 \RequirePackage{graphicx}
 \usepackage[usenames,dvipsnames]{xcolor}
-\usepackage[scale=0.9]{geometry}
+\usepackage[top=0.5cm, bottom=0.5cm, left=1cm, right=1cm]{geometry}
+\usepackage{setspace}
 \usepackage{tabularx}
 \usepackage{enumitem}
+\newcolumntype{C}{>{\centering\arraybackslash}X}
+\usepackage{supertabular}
+\newlength{\fullcollw}
+\setlength{\fullcollw}{0.47\textwidth}
+\usepackage{titlesec}
+\usepackage{multicol}
+\usepackage{multirow}
+\titleformat{\section}{\Large\scshape\raggedright}{}{0em}{}[\titlerule]
+\titlespacing{\section}{0pt}{5pt}{4pt}
+\usepackage[unicode, draft=false]{hyperref}
+\usepackage{fontawesome5}
+\definecolor{linkcolour}{rgb}{0,0.2,0.6}
+\hypersetup{colorlinks,breaklinks,urlcolor=linkcolour,linkcolor=linkcolour}
 
 \newcolumntype{C}{>{\centering\arraybackslash}X} 
 
