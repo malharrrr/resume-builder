@@ -73,6 +73,15 @@
 {{/each}}
 \end{tabularx}
 
+{{#if publications}}
+\section{Publications}
+\begin{itemize}[nosep, leftmargin=1em, itemsep=2pt, label=--]
+{{#each publications}}
+  \item {{this}}
+{{/each}}
+\end{itemize}
+{{/if}}
+
 \section{Professional Experience}
 {{#each experiences}}
 \begin{joblong}{ {{title}} }{ {{dates}} }
