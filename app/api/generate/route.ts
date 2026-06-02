@@ -401,6 +401,9 @@ export async function POST(req: NextRequest) {
 
     const templatePath = path.join(process.cwd(), 'base_template.tex');
     const baseTemplate = await fs.readFile(templatePath, 'utf-8');
+    Handlebars.registerHelper('href', (url: string) => {
+      return new Handlebars.SafeString(url || '');
+    });
     const template = Handlebars.compile(baseTemplate);
     const compiledTex = template(sanitizedData);
 
