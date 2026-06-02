@@ -54,11 +54,11 @@
 
 \begin{tabularx}{\linewidth}{@{} C @{}}
 \Huge{ {{name}} } \\[7.5pt]
-{{#if github_username~}}\href{https://github.com/{{{github_username}}}}{\raisebox{-0.05\height}\faGithub\ {{github_username}}} \ $|$ \ {{/if~}}
-{{#if linkedin_username~}}\href{https://linkedin.com/in/{{{linkedin_username}}}}{\raisebox{-0.05\height}\faLinkedin\ {{linkedin_username}}} \ $|$ \ {{/if~}}
-{{#if phone~}}\href{tel:{{{phone}}}}{\raisebox{-0.05\height}\faPhone\ {{phone}}} \ $|$ \ {{/if~}}
-{{#if email~}}\href{mailto:{{{email}}}}{\raisebox{-0.05\height}\faEnvelope\ {{email}}} \ $|$ \ {{/if~}}
-{{#if website~}}\href{ {{{website}}} }{\raisebox{-0.05\height}\faGlobe\ Portfolio}{{~else~}}{{#if portfolio~}}\href{ {{{portfolio}}} }{\raisebox{-0.05\height}\faGlobe\ Portfolio}{{~/if~}}{{/if~}} \\
+{{#if github_username~}}\href{https://github.com/{{{github_username}}}}{\raisebox{-0.05\height}\faGithub\ {{github_username}}} \ $|$ \ {{~/if}}
+{{#if linkedin_username~}}\href{https://linkedin.com/in/{{{linkedin_username}}}}{\raisebox{-0.05\height}\faLinkedin\ {{linkedin_username}}} \ $|$ \ {{~/if}}
+{{#if phone~}}\href{tel:{{{phone}}}}{\raisebox{-0.05\height}\faPhone\ {{phone}}} \ $|$ \ {{~/if}}
+{{#if email~}}\href{mailto:{{{email}}}}{\raisebox{-0.05\height}\faEnvelope\ {{email}}} \ $|$ \ {{~/if}}
+{{#if website~}}\href{ {{{website}}} }{\raisebox{-0.05\height}\faGlobe\ Portfolio}{{~else~}}{{#if portfolio~}}\href{ {{{portfolio}}} }{\raisebox{-0.05\height}\faGlobe\ Portfolio}{{~/if~}}{{/if}} \\
 \end{tabularx}
 
 {{#if summary}}
