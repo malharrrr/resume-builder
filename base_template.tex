@@ -73,11 +73,12 @@
 {{/if}}
 
 \section{Education}
-\begin{tabularx}{\linewidth}{@{}l X r@{}}
 {{#each education}}
-{{degree}}, \textbf{ {{institution}} } & & {{years}} \\
-{{/each}}
+\begin{tabularx}{\linewidth}{@{}X r@{}}
+{{degree}}, \textbf{ {{institution}} } & \small #1 {{years}} \\
 \end{tabularx}
+\vspace{2pt}
+{{/each}}
 
 {{#if publications}}
 \section{Publications}

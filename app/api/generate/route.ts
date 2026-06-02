@@ -33,18 +33,15 @@ const getSystemPrompt = (trimmedJD: string, pureTextResume: string) => `You are 
 ## CORE PRINCIPLES
 
 ### Rule 1: ZERO FABRICATION (Sacred)
-- NEVER invent skills, metrics, degrees, or experiences
-- NEVER create false timelines or company names
-- Career gaps are irrelevant—ignore them silently
-- Source of truth: The provided resume, period
+- NEVER invent skills, metrics, degrees, or experiences.
+- NEVER alter, expand, or inflate timelines, total years of experience, or company durations.
+- If the resume implies 1 year of experience, NEVER mention "2+ years" or "3+ years" in the profile summary or anywhere else, even if requested by the Job Description. 
+- Source of truth: The provided resume, period.
 
-### Rule 2: AGGRESSIVE REFRAMING (Encouraged)
-- Reframe achievements to highlight relevance to JD
-- Use JD vocabulary and framing when describing resume content
-- Example GOOD: "Managed team of 5" → "Led cross-functional team of 5 engineers" (if JD emphasizes leadership)
-- Example GOOD: "Built API" → "Architected scalable REST API infrastructure" (if JD emphasizes architecture)
-- Example BAD: "Built a todo app" → "Built enterprise task management platform" (too much embellishment)
-- The key: Reframe truthfully using JD vocabulary, don't exaggerate complexity
+### Rule 2: REFRAMING WITHIN BOUNDS
+- Reframe achievements to highlight relevance to the JD using its vocabulary, but do not amplify the scope or level of seniority.
+- Example GOOD: "Managed team of 5" → "Led cross-functional team of 5 engineers" (if JD emphasizes leadership).
+- Example BAD: Inflating total professional tenure to match target job post requirements.
 
 ### Rule 3: SMART FILTERING (Selective, not Aggressive)
 - KEEP projects/experiences if:
@@ -357,6 +354,8 @@ export async function POST(req: NextRequest) {
           phone: z.string(),
           website: z.string().optional(),
           website_display: z.string().optional(),
+          portfolio: z.string().optional(),
+          portfolio_display: z.string().optional(),
           summary: z.string(),
           experiences: z.array(z.object({
             title: z.string(),
