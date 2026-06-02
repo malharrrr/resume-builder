@@ -1,3 +1,4 @@
+name: CI/CD Pipeline
 
 on:
   pull_request:
@@ -8,15 +9,30 @@ jobs:
   ci:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v5
-      - name: Test
-        run: |
-          npm install
-          npm run test
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+
+      - name: Install dependencies
+        run: bun install --frozen-lockfile
+
+      - name: Lint code
+        run: bun run lint
+
+      - name: Build application
+        run: bun run build
 
       - name: Deploy
-        if: github.ref == 'refs/heads/testing'
+        if: github.ref == 'refs/heads/testing' && github.event_name == 'push'
         env:
           deploy_url: ${{ secrets.RENDER_DEPLOY_HOOK_URL }}
         run: |
-          curl "$deploy_url"
+          if [ -z "$deploy_url" ]; then
+            echo "Error: RENDER_DEPLOY_HOOK_URL is not set"
+            exit 1
+          fi
+          curl -X POST "$deploy_url"
