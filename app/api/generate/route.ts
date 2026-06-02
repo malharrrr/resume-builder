@@ -354,8 +354,7 @@ export async function POST(req: NextRequest) {
           phone: z.string(),
           website: z.string().optional(),
           website_display: z.string().optional(),
-          portfolio: z.string().optional(),
-          portfolio_display: z.string().optional(),
+          portfolio_url: z.string().describe("The user's personal website or portfolio link from their original resume profile text."),
           summary: z.string(),
           experiences: z.array(z.object({
             title: z.string(),
