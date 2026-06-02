@@ -14,7 +14,8 @@ COPY package.json bun.lock ./
 RUN bun install --frozen-lockfile
 
 COPY . .
-RUN bun run build
+ENV NEXT_TELEMETRY_DISABLED=1
+RUN bun run build -- --experimental-turbo
 
 EXPOSE 3000
 CMD ["bun", "run", "start"]
