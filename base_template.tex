@@ -1,7 +1,7 @@
-\documentclass[a4paper,12pt]{article}
+\documentclass[a4paper,10pt]{article}
 
 \usepackage{url}
-\usepackage{parskip} 	
+\usepackage{parskip}
 \setlength{\parskip}{0pt}
 \setlength{\parindent}{0pt}
 \RequirePackage{color}
@@ -11,102 +11,95 @@
 \usepackage{setspace}
 \usepackage{tabularx}
 \usepackage{enumitem}
-
-\newcolumntype{C}{>{\centering\arraybackslash}X} 
-
+\newcolumntype{C}{>{\centering\arraybackslash}X}
 \usepackage{supertabular}
-\usepackage{tabularx}
 \newlength{\fullcollw}
 \setlength{\fullcollw}{0.47\textwidth}
-
-\usepackage{titlesec}				
+\usepackage{titlesec}
 \usepackage{multicol}
 \usepackage{multirow}
-
 \titleformat{\section}{\Large\scshape\raggedright}{}{0em}{}[\titlerule]
-\titlespacing{\section}{0pt}{10pt}{10pt}
-
-\usepackage[style=authoryear,sorting=ynt, maxbibnames=2]{biblatex}
-
+\titlespacing{\section}{0pt}{5pt}{4pt}
 \usepackage[unicode, draft=false]{hyperref}
+\usepackage{fontawesome5}
 \definecolor{linkcolour}{rgb}{0,0.2,0.6}
 \hypersetup{colorlinks,breaklinks,urlcolor=linkcolour,linkcolor=linkcolour}
-\addbibresource{citations.bib}
-\setlength\bibitemsep{1em}
-
-\usepackage{fontawesome5}
-
-\newenvironment{jobshort}[2]
-{
-\begin{tabularx}{\linewidth}{@{}l X r@{}}
-\textbf{#1} & \hfill &  #2 \\[3.75pt]
-\end{tabularx}
-}
-{
-}
 
 \newenvironment{joblong}[2]
-{
-\begin{tabularx}{\linewidth}{@{}l X r@{}}
-\textbf{#1} & \hfill &  #2 \\[3.75pt]
-\end{tabularx}
-\begin{minipage}[t]{\linewidth}
-\begin{itemize}[nosep,after=\strut, leftmargin=1em, itemsep=3pt,label=--]
-}
-{
-\end{itemize}
-\end{minipage}    
+    {
+    \begin{tabularx}{\linewidth}{@{}l X r@{}}
+    \textbf{#1} & \hfill & #2 \\[3.75pt]
+    \end{tabularx}
+    \begin{minipage}[t]{\linewidth}
+    \begin{itemize}[nosep,after=\strut, leftmargin=1em, itemsep=1pt,label=--]
+    }
+    {
+    \end{itemize}
+    \end{minipage}
+    }
+
+\newenvironment{project}[3]{
+  \begin{tabularx}{\linewidth}{@{}l X r@{}}
+    \textbf{#1} & & \small #2
+  \end{tabularx}%
+  \vspace{-4pt}%
+  \begin{itemize}[nosep, leftmargin=1em, itemsep=1pt, label=--, topsep=2pt, partopsep=0pt]
+}{%
+  \end{itemize}%
+  \vspace{3pt}%
 }
 
 \begin{document}
-
-\pagestyle{empty} 
+\pagestyle{empty}
 
 \begin{tabularx}{\linewidth}{@{} C @{}}
 \Huge{ {{name}} } \\[7.5pt]
 {{#if github_username}}\href{https://github.com/{{{github_username}}} }{\raisebox{-0.05\height}\faGithub\ {{github_username}} } \ $|$ \ {{/if}}
 {{#if linkedin_username}}\href{https://linkedin.com/in/{{{linkedin_username}}} }{\raisebox{-0.05\height}\faLinkedin\ {{linkedin_username}} } \ $|$ \ {{/if}}
-{{#if website}}\href{ {{{website}}} }{\raisebox{-0.05\height}\faGlobe \ {{website_display}} } \ $|$ \ {{/if}}
-\href{mailto:{{{email}}} }{\raisebox{-0.05\height}\faEnvelope \ {{email}} } \ $|$ \ 
-\href{tel:{{{phone}}} }{\raisebox{-0.05\height}\faMobile \ {{phone}} } \\
+{{#if phone}}\href{tel:{{{phone}}} }{\raisebox{-0.05\height}\faPhone\ {{phone}} } \ $|$ \ {{/if}}
+{{#if email}}\href{mailto:{{{email}}} }{\raisebox{-0.05\height}\faEnvelope\ {{email}} } \ $|$ \ {{/if}}
+{{#if website}}\href{ {{{website}}} }{\raisebox{-0.05\height}\faGlobe\ {{website_display}} }{{/if}} \\
 \end{tabularx}
 
-\section{Summary}
-{{summary}}
+{{#if summary}}
+\section{Profile}
+{{{summary}}}
+{{/if}}
 
-\section{Work Experience}
+\section{Education}
+\begin{tabularx}{\linewidth}{@{}l X r@{}}
+{{#each education}}
+{{degree}}, \textbf{ {{institution}} } & & {{years}} \\
+{{/each}}
+\end{tabularx}
 
+\section{Professional Experience}
 {{#each experiences}}
 \begin{joblong}{ {{title}} }{ {{dates}} }
 {{#each bulletPoints}}
-\item {{this}}
+\item {{{this}}}
 {{/each}}
 \end{joblong}
-\vspace{4pt}
 {{/each}}
 
 \section{Projects}
-
 {{#each projects}}
-\begin{tabularx}{\linewidth}{ @{}l r@{} }
-\textbf{ {{name}} } & \hfill \href{ {{{link}}} }{ {{link_text}} } \\[3.75pt]
-\multicolumn{2}{@{}X@{}}{ {{description}} }  \\
-\end{tabularx}
-\vspace{4pt}
+\begin{project}{ {{name}} }{\href{ {{{link}}} }{ {{link_text}} }}{}
+{{#each bulletPoints}}
+  \item {{{this}}}
 {{/each}}
-
-\section{Education}
-\begin{tabularx}{\linewidth}{@{}l X@{}}	
-{{#each education}}
-{{years}} & {{degree}} at \textbf{ {{institution}} } 
+{{#if description}}
+  \item {{{description}}}
+{{/if}}
+\end{project}
 {{/each}}
-\end{tabularx}
 
 \section{Skills}
 \begin{tabularx}{\linewidth}{@{}l X@{}}
 {{#each skills}}
-{{category}} &  \normalsize{ {{items}} }\\
+\textbf{ {{category}} } & {{{items}}} \\
 {{/each}}
 \end{tabularx}
 
+\vfill
 \end{document}
