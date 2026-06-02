@@ -391,6 +391,8 @@ export async function POST(req: NextRequest) {
     console.log(`[GENERATE_INFO] Job ${uniqueId} | AI generation successful`);
 
     const sanitizedData = sanitizeEmojisAndUnicode(resumeData);
+    if (sanitizedData.website) sanitizedData.website = sanitizedData.website.trim();
+    if (sanitizedData.portfolio_url) sanitizedData.portfolio_url = sanitizedData.portfolio_url.trim();
 
     const optimizedResumeText = [
       resumeData.summary,
