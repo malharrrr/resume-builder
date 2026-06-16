@@ -391,7 +391,7 @@ export async function POST(req: NextRequest) {
     console.log(`[GENERATE_INFO] Job ${uniqueId} | AI generation successful`);
 
     const sanitizedData = sanitizeEmojisAndUnicode(resumeData);
-    if (sanitizedData.website) sanitizedData.website = sanitizedData.website.trim();
+    sanitizedData.website = (sanitizedData.website || sanitizedData.portfolio_url || '').trim();
     if (sanitizedData.portfolio_url) sanitizedData.portfolio_url = sanitizedData.portfolio_url.trim();
 
     const optimizedResumeText = [
@@ -403,8 +403,9 @@ export async function POST(req: NextRequest) {
 
     const templatePath = path.join(process.cwd(), 'base_template.tex');
     const baseTemplate = await fs.readFile(templatePath, 'utf-8');
-    Handlebars.registerHelper('href', (url: string) => {
-      return new Handlebars.SafeString(url || '');
+    Handlebars.registerHelper('raw', function (value: string) 
+    {
+      return new Handlebars.SafeString(value || '');
     });
     const template = Handlebars.compile(baseTemplate);
     const compiledTex = template(sanitizedData);
