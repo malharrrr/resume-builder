@@ -183,6 +183,7 @@ Before returning JSON:
 - Inferred skills (2-4 per role) justified by evidence ✓
 - Projects reordered by JD relevance ✓
 - Bullets ordered by impact/relevance ✓
+- Projects use bulletPoints (2-4 per project) to highlight specific achievements, mirroring the style used for experiences ✓
 - Education/certs highlighted if relevant ✓
 - Transferable skills extracted and mentioned ✓
 - No fabrication anywhere ✓
@@ -365,7 +366,8 @@ export async function POST(req: NextRequest) {
             name: z.string(),
             link: z.string(),
             link_text: z.string(),
-            description: z.string()
+            description: z.string(),
+            bulletPoints: z.array(z.string()).min(1)
           })),
           education: z.array(z.object({
             years: z.string(),
