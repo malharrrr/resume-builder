@@ -3,9 +3,10 @@ import { generateObject } from 'ai';
 import { google } from '@ai-sdk/google';
 import { z } from 'zod';
 import Handlebars from 'handlebars';
-import { exec } from 'child_process';
+import { execFile } from 'child_process';
 import { promisify } from 'util';
 import fs from 'fs/promises';
+const execFileAsync = promisify(execFile);
 import path from 'path';
 import crypto from 'crypto';
 import { calculateATSScore, calculateResumeHealthScore } from '../ats_scoring_system';
@@ -422,8 +423,13 @@ export async function POST(req: NextRequest) {
     console.log(`[GENERATE_INFO] Job ${uniqueId} | Starting parallel: pdflatex + ATS scoring`);
 
     const [pdfBuffer, atsScores] = await Promise.all([
-      execAsync(`pdflatex -interaction=nonstopmode -halt-on-error --synctex=0 -output-directory=${tempDir} ${texPath}`)
-        .then(() => fs.readFile(pdfPath)),
+      execFileAsync('pdflatex', [
+        '-interaction=nonstopmode',
+        '-halt-on-error',
+        '--synctex=0',
+        `-output-directory=${tempDir}`,
+        texPath
+      ]).then(() => fs.readFile(pdfPath)),
       Promise.resolve(calculateATSScore(optimizedResumeText, trimmedJD))
     ]);
 
