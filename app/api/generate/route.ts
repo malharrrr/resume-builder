@@ -392,6 +392,7 @@ export async function POST(req: NextRequest) {
 
     const sanitizedData = sanitizeEmojisAndUnicode(resumeData);
     sanitizedData.website = (sanitizedData.website || sanitizedData.portfolio_url || '').trim();
+    resumeData.projects?.forEach(p => { if (p.link) p.link = p.link.trim(); });
     sanitizedData.github_username_url = sanitizedData.github_username ? `https://github.com/${sanitizedData.github_username}` : '';
     sanitizedData.linkedin_username_url = sanitizedData.linkedin_username ? `https://linkedin.com/in/${sanitizedData.linkedin_username}` : '';
     sanitizedData.phone_url = sanitizedData.phone ? `tel:${sanitizedData.phone}` : '';

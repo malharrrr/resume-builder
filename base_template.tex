@@ -94,7 +94,7 @@
 
 \section{Projects}
 {{#each projects}}
-\begin{project}{ {{name}} }{{~#if link~}}\href{ {{{link}}} }{{~#if link_text~}}{{link_text}}{{~else~}}Link{{~/if~}}}{{~/if~}}{}
+\begin{project}{ {{name}} }{{#if link}}{\href{ {{raw link}} }{ {{~#if link_text~}}{{link_text}}{{~else~}}Link{{~/if~}} }}{{else}}{}{{/if}}
 {{#each bulletPoints}}
   \item {{this}}
 {{/each}}
