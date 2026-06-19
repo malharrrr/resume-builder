@@ -394,11 +394,19 @@ export async function POST(req: NextRequest) {
 
     const sanitizedData = sanitizeEmojisAndUnicode(resumeData);
     sanitizedData.website = (sanitizedData.website || sanitizedData.portfolio_url || '').trim();
-    resumeData.projects?.forEach(p => { if (p.link) p.link = p.link.trim(); });
+    sanitizedData.projects?.forEach((p: any) => { if (p.link) p.link = p.link.trim(); });
     sanitizedData.github_username_url = sanitizedData.github_username ? `https://github.com/${sanitizedData.github_username}` : '';
     sanitizedData.linkedin_username_url = sanitizedData.linkedin_username ? `https://linkedin.com/in/${sanitizedData.linkedin_username}` : '';
     sanitizedData.phone_url = sanitizedData.phone ? `tel:${sanitizedData.phone}` : '';
     sanitizedData.email_url = sanitizedData.email ? `mailto:${sanitizedData.email}` : '';
+
+    sanitizedData.experiences?.forEach((e: any) => {
+      e.bulletPoints = (e.bulletPoints || []).filter((b: string) => b.trim().length > 0);
+      });
+    sanitizedData.projects?.forEach((p: any) => {
+      p.bulletPoints = (p.bulletPoints || []).filter((b: string) => b.trim().length > 0);
+      if (p.link) p.link = p.link.trim();
+      });
 
     const optimizedResumeText = [
       resumeData.summary,
@@ -444,12 +452,14 @@ export async function POST(req: NextRequest) {
     });
 
   } catch (error) {
-    console.error(`[GENERATE_ERROR] Job ${uniqueId} Failed:`, error);
-    return NextResponse.json({ error: 'Failed to process resume' }, { status: 500 });
-  } finally {
-    const cleanUp = async (ext: string) => {
-      try { await fs.rm(path.join(tempDir, `resume_${uniqueId}${ext}`)); } catch (e) {}
-    };
-    await Promise.all(['.tex', '.pdf', '.log', '.aux', '.out'].map(cleanUp));
-  }
-}
+  console.error(`[GENERATE_ERROR] Job ${uniqueId} Failed:`, error);
+  try {
+    const debugTex = await fs.readFile(texPath, 'utf-8');
+    await fetch('/api/log', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action: 'GENERATE_ERROR_TEX_DUMP', details: { jobId: uniqueId, tex: debugTex } }),
+    });
+  } catch (e) {}
+  return NextResponse.json({ error: 'Failed to process resume' }, { status: 500 });
+}}

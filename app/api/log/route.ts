@@ -4,8 +4,13 @@ export async function POST(req: NextRequest) {
   try {
     const body = await req.json();
     const { action, details } = body;
-    console.log(`[USER ACTION] ${action} |`, details ? JSON.stringify(details) : '');
-    
+
+    if (action === 'GENERATE_ERROR_TEX_DUMP') {
+      console.error(`[TEX_DUMP] Job ${details?.jobId}:\n${details?.tex}`);
+    } else {
+      console.log(`[USER ACTION] ${action} |`, details ? JSON.stringify(details) : '');
+    }
+
     return NextResponse.json({ success: true });
   } catch (error) {
     console.error('[LOGGING ERROR] Failed to parse log request');
