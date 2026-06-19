@@ -455,11 +455,11 @@ export async function POST(req: NextRequest) {
   console.error(`[GENERATE_ERROR] Job ${uniqueId} Failed:`, error);
   try {
     const debugTex = await fs.readFile(texPath, 'utf-8');
-    await fetch('/api/log', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ action: 'GENERATE_ERROR_TEX_DUMP', details: { jobId: uniqueId, tex: debugTex } }),
-    });
-  } catch (e) {}
+    console.error(`[TEX_DUMP_START] Job ${uniqueId}`);
+    console.error(debugTex);
+    console.error(`[TEX_DUMP_END] Job ${uniqueId}`);
+  } catch (e) {
+    console.error(`[TEX_DUMP_FAILED] Could not read tex file: ${e}`);
+  }
   return NextResponse.json({ error: 'Failed to process resume' }, { status: 500 });
 }}
