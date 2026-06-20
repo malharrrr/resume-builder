@@ -26,6 +26,24 @@ Handlebars.Utils.escapeExpression = function (text: any) {
     .replace(/\^/g, '\\textasciicircum ');
 };
 
+Handlebars.registerHelper('raw', function (value: string) {
+  return new Handlebars.SafeString(value || '');
+});
+
+let _compiledTemplate: HandlebarsTemplateDelegate | null = null;
+
+async function getTemplate(): Promise<HandlebarsTemplateDelegate> {
+  if (!_compiledTemplate) {
+    const baseTemplate = await fs.readFile(
+      path.join(process.cwd(), 'base_template.tex'),
+      'utf-8'
+    );
+    _compiledTemplate = Handlebars.compile(baseTemplate);
+  }
+  return _compiledTemplate;
+}
+
+
 const execAsync = promisify(exec);
 
 const getSystemPrompt = (trimmedJD: string, pureTextResume: string) => `You are an expert ATS-optimized resume generation engine. Your goal is to maximize the candidate's chances while maintaining absolute honesty. Every claim must be traceable to the resume.
@@ -184,6 +202,7 @@ Before returning JSON:
 - Projects reordered by JD relevance ✓
 - Bullets ordered by impact/relevance ✓
 - Projects use bulletPoints (2-4 per project) to highlight specific achievements, mirroring the style used for experiences ✓
+- Each experience must have at least 1 bullet point in bulletPoints ✓
 - Education/certs highlighted if relevant ✓
 - Transferable skills extracted and mentioned ✓
 - No fabrication anywhere ✓
@@ -344,7 +363,7 @@ export async function POST(req: NextRequest) {
     const trimmedJD = trimJD(rawJD);
     console.log(`[GENERATE_INFO] Job ${uniqueId} | JD: ${trimmedJD.length} chars | Resume: ${pureTextResume.length} chars`);
 
-    const [{ object: resumeData }, resumeHealthScore] = await Promise.all([
+    const [{ object: resumeData }, resumeHealthScore, baselineATSScore] = await Promise.all([
       generateObject({
         model: google('gemini-3.1-flash-lite'),
         schema: z.object({
@@ -360,7 +379,7 @@ export async function POST(req: NextRequest) {
           experiences: z.array(z.object({
             title: z.string(),
             dates: z.string(),
-            bulletPoints: z.array(z.string())
+            bulletPoints: z.array(z.string()).min(1)
           })),
           projects: z.array(z.object({
             name: z.string(),
@@ -382,7 +401,8 @@ export async function POST(req: NextRequest) {
         }),
         prompt: getSystemPrompt(trimmedJD, pureTextResume)
       }),
-      (calculateResumeHealthScore(pureTextResume))
+      calculateResumeHealthScore(pureTextResume),
+      Promise.resolve(calculateATSScore(pureTextResume, trimmedJD))
     ]);
 
     if (resumeData.name === 'INVALID_JD') {
@@ -394,7 +414,7 @@ export async function POST(req: NextRequest) {
 
     const sanitizedData = sanitizeEmojisAndUnicode(resumeData);
     sanitizedData.website = (sanitizedData.website || sanitizedData.portfolio_url || '').trim();
-    sanitizedData.projects?.forEach((p: any) => { if (p.link) p.link = p.link.trim(); });
+
     sanitizedData.github_username_url = sanitizedData.github_username ? `https://github.com/${sanitizedData.github_username}` : '';
     sanitizedData.linkedin_username_url = sanitizedData.linkedin_username ? `https://linkedin.com/in/${sanitizedData.linkedin_username}` : '';
     sanitizedData.phone_url = sanitizedData.phone ? `tel:${sanitizedData.phone}` : '';
@@ -402,11 +422,11 @@ export async function POST(req: NextRequest) {
 
     sanitizedData.experiences?.forEach((e: any) => {
       e.bulletPoints = (e.bulletPoints || []).filter((b: string) => b.trim().length > 0);
-      });
+    });
     sanitizedData.projects?.forEach((p: any) => {
       p.bulletPoints = (p.bulletPoints || []).filter((b: string) => b.trim().length > 0);
       if (p.link) p.link = p.link.trim();
-      });
+    });
 
     const optimizedResumeText = [
       resumeData.summary,
@@ -415,13 +435,7 @@ export async function POST(req: NextRequest) {
       resumeData.skills.map(s => s.items).join(' ')
     ].join(' ');
 
-    const templatePath = path.join(process.cwd(), 'base_template.tex');
-    const baseTemplate = await fs.readFile(templatePath, 'utf-8');
-    Handlebars.registerHelper('raw', function (value: string) 
-    {
-      return new Handlebars.SafeString(value || '');
-    });
-    const template = Handlebars.compile(baseTemplate);
+    const template = await getTemplate();
     const compiledTex = template(sanitizedData);
 
     await fs.mkdir(tempDir, { recursive: true });
@@ -435,7 +449,7 @@ export async function POST(req: NextRequest) {
       Promise.resolve(calculateATSScore(optimizedResumeText, trimmedJD))
     ]);
 
-    console.log(`[GENERATE_SUCCESS] Job ${uniqueId} | ATS: ${atsScores.overallScore}/100 | Health: ${resumeHealthScore.score}/100`);
+    console.log(`[GENERATE_SUCCESS] Job ${uniqueId} | ATS: ${atsScores.overallScore}/100 | Baseline: ${baselineATSScore.overallScore}/100 | Health: ${resumeHealthScore.score}/100`);
 
     return NextResponse.json({
       pdf: pdfBuffer.toString('base64'),
@@ -444,22 +458,28 @@ export async function POST(req: NextRequest) {
         atsScores,
         resumeHealth: resumeHealthScore,
         improvement: {
-          beforeATS: 60,
+          beforeATS: baselineATSScore.overallScore,
           afterATS: atsScores.overallScore,
-          improvement: atsScores.overallScore - 60
+          improvement: atsScores.overallScore - baselineATSScore.overallScore
         }
       }
     });
 
   } catch (error) {
-  console.error(`[GENERATE_ERROR] Job ${uniqueId} Failed:`, error);
-  try {
-    const debugTex = await fs.readFile(texPath, 'utf-8');
-    console.error(`[TEX_DUMP_START] Job ${uniqueId}`);
-    console.error(debugTex);
-    console.error(`[TEX_DUMP_END] Job ${uniqueId}`);
-  } catch (e) {
-    console.error(`[TEX_DUMP_FAILED] Could not read tex file: ${e}`);
+    console.error(`[GENERATE_ERROR] Job ${uniqueId} Failed:`, error);
+    try {
+      const debugTex = await fs.readFile(texPath, 'utf-8');
+      console.error(`[TEX_DUMP_START] Job ${uniqueId}`);
+      console.error(debugTex);
+      console.error(`[TEX_DUMP_END] Job ${uniqueId}`);
+    } catch (e) {
+      console.error(`[TEX_DUMP_FAILED] Could not read tex file: ${e}`);
+    }
+    return NextResponse.json({ error: 'Failed to process resume' }, { status: 500 });
+  } finally {
+    const cleanUp = async (ext: string) => {
+      try { await fs.rm(path.join(tempDir, `resume_${uniqueId}${ext}`)); } catch (e) {}
+    };
+    await Promise.all(['.tex', '.pdf', '.log', '.aux', '.out', '.synctex.gz'].map(cleanUp));
   }
-  return NextResponse.json({ error: 'Failed to process resume' }, { status: 500 });
-}}
+}
