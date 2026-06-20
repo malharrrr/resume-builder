@@ -8,7 +8,7 @@ export async function POST(req: NextRequest) {
     if (action === 'GENERATE_ERROR_TEX_DUMP') {
       console.error(`[TEX_DUMP] Job ${details?.jobId}:\n${details?.tex}`);
     } else {
-      console.log(`[USER ACTION] ${action} |`, details ? JSON.stringify(details) : '');
+      console.log('[USER ACTION] %s | %s', action, details ? JSON.stringify(details) : '');
     }
 
     return NextResponse.json({ success: true });
