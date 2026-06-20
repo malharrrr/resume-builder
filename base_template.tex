@@ -39,11 +39,7 @@
     \end{minipage}
     }
 
-\newenvironment{project}[2]{
-  \begin{tabularx}{\linewidth}{@{}l X r@{}}
-    \textbf{#1} & & \small #2
-  \end{tabularx}%
-  \vspace{-4pt}%
+\newenvironment{project}{
   \begin{itemize}[nosep, leftmargin=1em, itemsep=1pt, label=--, topsep=2pt, partopsep=0pt]
 }{%
   \end{itemize}%
@@ -99,10 +95,11 @@
 
 \section{Projects}
 {{#each projects}}
-\begin{project}{ {{name}} }{}
-{{#if link}}
-  \item \href{ {{raw link}} }{ {{~#if link_text~}}[{{link_text}}]{{~else~}}[Link]{{~/if~}} }
-{{/if}}
+\begin{tabularx}{\linewidth}{@{}l X r@{}}
+  \textbf{ {{name}} } & & {{#if link}}\small\href{ {{raw link}} }{ {{raw link_text}} }{{/if}}
+\end{tabularx}%
+\vspace{-4pt}%
+\begin{project}
 {{#if bulletPoints}}
 {{#each bulletPoints}}
   \item {{this}}

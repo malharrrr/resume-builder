@@ -384,7 +384,7 @@ export async function POST(req: NextRequest) {
           projects: z.array(z.object({
             name: z.string(),
             link: z.string(),
-            link_text: z.string(),
+            link_text: z.string().describe("Short display text for the link — use the bare hostname/path only, e.g. 'github.com/user/repo', 'npmjs.com/package/name', 'myapp.vercel.app'. No 'https://', no 'www.' prefix unless needed for clarity, no phrases like 'View Project' or 'GitHub Repository'."),
             description: z.string(),
             bulletPoints: z.array(z.string()).min(1)
           })),
@@ -425,7 +425,18 @@ export async function POST(req: NextRequest) {
     });
     sanitizedData.projects?.forEach((p: any) => {
       p.bulletPoints = (p.bulletPoints || []).filter((b: string) => b.trim().length > 0);
-      if (p.link) p.link = p.link.trim();
+      if (p.link) {
+        p.link = p.link.trim();
+        const isPhrase = !p.link_text || /view|project|repo|click|here|demo|site|app|github repository|npm package/i.test(p.link_text);
+        if (isPhrase) {
+          try {
+            const u = new URL(p.link);
+            p.link_text = (u.hostname.replace(/^www\./, '') + u.pathname).replace(/\/$/, '');
+          } catch {
+            p.link_text = p.link_text || p.link;
+          }
+        }
+      }
     });
 
     const optimizedResumeText = [
