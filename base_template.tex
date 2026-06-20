@@ -39,7 +39,7 @@
     \end{minipage}
     }
 
-\newenvironment{project}[3]{
+\newenvironment{project}[2]{
   \begin{tabularx}{\linewidth}{@{}l X r@{}}
     \textbf{#1} & & \small #2
   \end{tabularx}%
@@ -99,7 +99,10 @@
 
 \section{Projects}
 {{#each projects}}
-\begin{project}{ {{name}} }{{#if link}}{\href{ {{raw link}} }{ {{~#if link_text~}}{{link_text}}{{~else~}}Link{{~/if~}} }}{{else}}{}{{/if}}{}
+\begin{project}{ {{name}} }{}
+{{#if link}}
+  \item \href{ {{raw link}} }{ {{~#if link_text~}}[{{link_text}}]{{~else~}}[Link]{{~/if~}} }
+{{/if}}
 {{#if bulletPoints}}
 {{#each bulletPoints}}
   \item {{this}}
