@@ -125,9 +125,7 @@ export default function ResumeBuilder() {
         setAnalytics(data.analytics);
         setShowAnalytics(true);
       }
-      
-      logUserAction('GENERATE_SUCCESS');
-      logUserAction('GENERATE_SUCCESS');
+
       logUserAction('GENERATE_COMPLETE', { totalTimeMs: Math.round(performance.now() - generateStartTime) });
 
     } catch (err: any) {
@@ -340,7 +338,9 @@ export default function ResumeBuilder() {
                             <p className="font-bold text-white">{analytics.improvement.beforeATS}</p>
                           </div>
                           <div className="text-center">
-                            <p className="text-green-400 font-bold">+{analytics.improvement.improvement}</p>
+                            <p className={`font-bold ${analytics.improvement.improvement >= 0 ? 'text-green-400' : 'text-orange-400'}`}>
+                              {analytics.improvement.improvement >= 0 ? '+' : ''}{analytics.improvement.improvement}
+                            </p>
                           </div>
                           <div>
                             <p className="text-zinc-400">Optimized</p>
@@ -411,8 +411,8 @@ export default function ResumeBuilder() {
                     </div>
                     <div>
                       <p className="text-zinc-400">Improvement</p>
-                      <p className="text-2xl font-bold text-green-400">
-                        +{analytics.improvement.improvement}
+                      <p className={`text-2xl font-bold ${analytics.improvement.improvement >= 0 ? 'text-green-400' : 'text-orange-400'}`}>
+                        {analytics.improvement.improvement >= 0 ? '+' : ''}{analytics.improvement.improvement}
                       </p>
                     </div>
                   </div>
