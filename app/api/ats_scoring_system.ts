@@ -1,5 +1,5 @@
-interface ATSScore {
-  overallScore: number; 
+export interface ATSScore {
+  overallScore: number;
   semanticSimilarity: number;
   keywordCoverage: number;
   formatReadiness: number;
@@ -11,45 +11,89 @@ interface ATSScore {
   };
 }
 
-function extractConcepts(text: string): string[] {
-  const concepts = new Set<string>();
-  
-  const skills = text.match(/\b(python|javascript|typescript|java|kotlin|golang|rust|csharp|php|ruby|scala|swift|objective-c|r|matlab|sql|postgres|mongodb|redis|elasticsearch|aws|azure|gcp|docker|kubernetes|terraform|jenkins|github|gitlab|react|vue|angular|node|django|flask|fastapi|spring|express|rails|laravel|next|nuxt|graphql|rest|api|microservices|devops|ci\/cd|machine learning|deep learning|nlp|computer vision|reinforcement learning|tensorflow|pytorch|scikit-learn|pandas|numpy|spark|hadoop|kafka|flink|databricks)\b/gi);
-  if (skills) skills.forEach(s => concepts.add(s.toLowerCase()));
+const SKILL_ALIASES: Record<string, string[]> = {
+  'react': ['react.js', 'reactjs', 'react js'],
+  'node': ['node.js', 'nodejs', 'node js'],
+  'typescript': ['ts'],
+  'javascript': ['js'],
+  'python': ['py'],
+  'golang': ['go lang', 'go programming'],
+  'postgresql': ['postgres', 'psql'],
+  'mongodb': ['mongo'],
+  'kubernetes': ['k8s'],
+  'elasticsearch': ['elastic search', 'opensearch'],
+  'cicd': ['ci/cd', 'ci cd', 'continuous integration', 'continuous deployment'],
+  'graphql': ['graph ql'],
+  'nextjs': ['next.js', 'next js'],
+  'fastapi': ['fast api'],
+  'langchain': ['lang chain'],
+  'langgraph': ['lang graph'],
+  'tensorflow': ['tensor flow'],
+  'pytorch': ['torch'],
+  'scikit': ['sklearn', 'scikit-learn', 'scikit learn'],
+  'dynamodb': ['dynamo db', 'dynamo'],
+  'gcp': ['google cloud', 'google cloud platform'],
+  'aws': ['amazon web services', 'amazon aws'],
+  'azure': ['microsoft azure'],
+  'restapi': ['rest api', 'rest apis', 'restful', 'rest'],
+  'microservices': ['micro services', 'micro-services'],
+};
 
-  const roles = text.match(/\b(engineer|developer|architect|lead|senior|principal|manager|director|analyst|consultant|specialist|coordinator|administrator|technician)\b/gi);
-  if (roles) roles.forEach(r => concepts.add(r.toLowerCase()));
-
-  const domains = text.match(/\b(frontend|backend|full-stack|fullstack|mobile|web|desktop|cloud|infrastructure|platform|data|security|devops|qa|testing|analytics|business intelligence|crm|erp|saas|api|database|storage|networking|systems|scalability|performance|optimization|automation|integration|deployment|monitoring|observability)\b/gi);
-  if (domains) domains.forEach(d => concepts.add(d.toLowerCase()));
-
-  const verbs = text.match(/\b(built|developed|designed|architected|implemented|created|engineered|deployed|managed|led|mentored|optimized|improved|reduced|increased|automated|integrated|collaborated|coordinated|led|directed)\b/gi);
-  if (verbs) verbs.forEach(v => concepts.add(v.toLowerCase()));
-
-  return Array.from(concepts);
+const ALIAS_TO_CANONICAL: Record<string, string> = {};
+for (const [canonical, aliases] of Object.entries(SKILL_ALIASES)) {
+  for (const alias of aliases) {
+    ALIAS_TO_CANONICAL[alias] = canonical;
+  }
 }
 
-function calculateSemanticSimilarity(resumeText: string, jdText: string): number {
-  const resumeConcepts = new Set(extractConcepts(resumeText));
-  const jdConcepts = new Set(extractConcepts(jdText));
+function normalizeSkill(skill: string): string {
+  const lower = skill.toLowerCase().trim();
+  return ALIAS_TO_CANONICAL[lower] ?? lower;
+}
 
-  const intersection = Array.from(resumeConcepts).filter(c => jdConcepts.has(c));
+const STOP_WORDS = new Set([
+  'the','and','for','with','that','this','from','are','you','all','can',
+  'her','was','one','our','out','day','get','has','him','his','how','its',
+  'may','new','now','old','see','two','way','who','boy','did','let','put',
+  'say','she','too','use','will','have','been','they','them','their','what',
+  'when','your','than','but','not','also','into','more','over','such','some',
+  'each','work','well','just','like','make','must','need','only','than','then',
+  'very','would','about','after','other','which','these','those','there',
+]);
 
-  const union = new Set([...resumeConcepts, ...jdConcepts]);
+function tokenize(text: string): string[] {
+  return text
+    .toLowerCase()
+    .replace(/[^a-z0-9\s\/\+\#\.]/g, ' ')
+    .split(/\s+/)
+    .map(t => t.replace(/^[^a-z0-9]+|[^a-z0-9]+$/g, ''))
+    .filter(t => t.length > 1 && !STOP_WORDS.has(t));
+}
 
-  const similarity = union.size > 0 ? (intersection.length / union.size) * 100 : 0;
+function extractNgrams(text: string, maxN = 3): string[] {
+  const words = tokenize(text);
+  const ngrams: string[] = [...words];
 
-  const techSkillsResume = extractConcepts(resumeText).filter(c => 
-    /python|javascript|java|aws|react|node|sql|docker|kubernetes/.test(c)
-  );
-  const techSkillsJD = extractConcepts(jdText).filter(c => 
-    /python|javascript|java|aws|react|node|sql|docker|kubernetes/.test(c)
-  );
-  
-  const techOverlap = techSkillsResume.filter(s => techSkillsJD.includes(s)).length;
-  const techBoost = Math.min(techOverlap * 5, 20);
+  for (let n = 2; n <= maxN; n++) {
+    for (let i = 0; i <= words.length - n; i++) {
+      ngrams.push(words.slice(i, i + n).join(' '));
+    }
+  }
+  return ngrams;
+}
 
-  return Math.min(similarity + techBoost, 100);
+function computeTermFrequency(terms: string[]): Map<string, number> {
+  const freq = new Map<string, number>();
+  for (const t of terms) {
+    freq.set(t, (freq.get(t) ?? 0) + 1);
+  }
+  return freq;
+}
+
+function tfidfWeight(count: number, totalTerms: number): number {
+  const tf = count / totalTerms;
+  const rarityBoost = count === 1 ? 1.5 : 1.0;
+  return (1 + Math.log(1 + tf * 100)) * rarityBoost;
 }
 
 function calculateKeywordCoverage(resumeText: string, jdText: string): {
@@ -57,98 +101,179 @@ function calculateKeywordCoverage(resumeText: string, jdText: string): {
   matched: string[];
   missing: string[];
 } {
-  const commonWords = new Set(['the', 'and', 'for', 'with', 'that', 'this', 'from', 'are', 'you', 'all', 'can', 'her', 'was', 'one', 'our', 'out', 'day', 'get', 'has', 'him', 'his', 'how', 'its', 'may', 'new', 'now', 'old', 'see', 'two', 'way', 'who', 'boy', 'did', 'its', 'let', 'put', 'say', 'she', 'too', 'use']);
-  
-  const jdWords = jdText.toLowerCase().match(/\b[a-z]+\b/g) || [];
-  const jdKeywords = [...new Set(jdWords)]
-    .filter(w => w.length > 3 && !commonWords.has(w));
+  const jdNgrams = extractNgrams(jdText);
+  const jdFreq = computeTermFrequency(jdNgrams);
+  const totalJdTerms = jdNgrams.length;
 
-  const resumeText_lower = resumeText.toLowerCase();
-  const matched = jdKeywords.filter(keyword => resumeText_lower.includes(keyword));
+  const uniqueJdTerms = Array.from(jdFreq.keys())
+    .filter(t => t.length > 2 && !STOP_WORDS.has(t));
 
-  const score = jdKeywords.length > 0 ? (matched.length / jdKeywords.length) * 100 : 50;
-  const missing = jdKeywords.filter(k => !matched.includes(k)).slice(0, 10);
+  const resumeNgrams = new Set(extractNgrams(resumeText).map(normalizeSkill));
+
+  let totalWeight = 0;
+  let matchedWeight = 0;
+  const matched: string[] = [];
+  const missing: string[] = [];
+
+  for (const term of uniqueJdTerms) {
+    const normalized = normalizeSkill(term);
+    const weight = tfidfWeight(jdFreq.get(term) ?? 1, totalJdTerms);
+    totalWeight += weight;
+
+    if (resumeNgrams.has(normalized)) {
+      matchedWeight += weight;
+      if (term.length > 3 || term.includes(' ')) {
+        matched.push(term);
+      }
+    } else {
+      if (term.length > 3 || term.includes(' ')) {
+        missing.push(term);
+      }
+    }
+  }
+
+  const score = totalWeight > 0 ? (matchedWeight / totalWeight) * 100 : 50;
+
+  const topMissing = missing
+    .sort((a, b) => (jdFreq.get(b) ?? 0) - (jdFreq.get(a) ?? 0))
+    .slice(0, 10);
 
   return {
     score: Math.min(score, 100),
-    matched: matched.slice(0, 10),
-    missing: missing.slice(0, 10)
+    matched: matched.slice(0, 12),
+    missing: topMissing,
   };
 }
 
-function calculateFormatReadiness(resumeText: string): number {
-  let score = 0;
+const KNOWN_SKILL_PATTERNS = [
+  // Languages
+  /\b(python|javascript|typescript|java|golang|go|rust|c\+\+|csharp|ruby|scala|swift|kotlin|php|bash|r\b|matlab|solidity)\b/gi,
+  // Frameworks & libraries
+  /\b(react|vue|angular|svelte|next\.?js|nuxt|express|fastapi|flask|django|rails|spring|laravel|nest\.?js|fiber|gin|echo)\b/gi,
+  // AI/ML
+  /\b(langchain|langgraph|llamaindex|openai|anthropic|gemini|hugging\s*face|tensorflow|pytorch|keras|scikit[\s-]learn|pandas|numpy|transformers|rag|llm|embedding|vector|pinecone|weaviate|qdrant|chroma|faiss|mcp|mastra)\b/gi,
+  // Databases
+  /\b(postgresql|postgres|mysql|mongodb|redis|elasticsearch|cassandra|dynamodb|sqlite|cockroachdb|supabase|firebase|timescaledb|neo4j|planetscale|neon|prisma|drizzle|sqlalchemy)\b/gi,
+  // Cloud & infra
+  /\b(aws|azure|gcp|docker|kubernetes|k8s|terraform|ansible|pulumi|jenkins|github\s*actions|gitlab\s*ci|ci\/cd|nginx|linux|vercel|render|railway|fly\.io)\b/gi,
+  // Protocols & patterns
+  /\b(rest(?:ful)?|graphql|grpc|websocket|protobuf|kafka|rabbitmq|celery|microservices|event[\s-]driven|serverless)\b/gi,
+  // Frontend tooling
+  /\b(tailwind|tailwindcss|shadcn|radix|chakra|mui|styled[\s-]components|webpack|vite|esbuild|bun)\b/gi,
+];
 
-  const sections = {
-    summary: /summary|professional|about|profile/i,
-    experience: /experience|work history|employment/i,
-    education: /education|degree|university|college/i,
-    skills: /skills|technical|competencies/i,
-    projects: /projects|portfolio|work|achievements/i
-  };
-
-  Object.values(sections).forEach(regex => {
-    if (regex.test(resumeText)) score += 15;
-  });
-
-  if (/@/.test(resumeText)) score += 5; 
-  if (/\d{3}[-.\s]?\d{3}[-.\s]?\d{4}/.test(resumeText)) score += 5;
-
-  const lines = resumeText.split('\n').length;
-  if (lines >= 20 && lines <= 150) score += 10;
-
-  const metrics = resumeText.match(/\d+%|decreased|improved|reduced|increased|optimized|accelerated|achieved/gi);
-  if (metrics && metrics.length >= 3) score += 15;
-
-  const words = resumeText.split(/\s+/).length;
-  if (words >= 200 && words <= 1000) score += 10;
-
-  if (/linkedin|github|portfolio|website/.test(resumeText)) score += 10;
-
-  return Math.min(score, 100);
+function extractSkillsFromText(text: string): Set<string> {
+  const skills = new Set<string>();
+  for (const pattern of KNOWN_SKILL_PATTERNS) {
+    const matches = text.matchAll(new RegExp(pattern.source, 'gi'));
+    for (const m of matches) {
+      skills.add(normalizeSkill(m[0]));
+    }
+  }
+  return skills;
 }
 
 function calculateSkillsMatch(resumeText: string, jdText: string): {
   score: number;
   matchedSkills: string[];
+  missingSkills: string[];
 } {
-  const technicalSkills = [
-    'python', 'javascript', 'typescript', 'java', 'kotlin', 'golang', 'rust', 'csharp',
-    'sql', 'postgres', 'mongodb', 'redis', 'elasticsearch', 'cassandra', 'dynamodb',
-    'aws', 'azure', 'gcp', 'docker', 'kubernetes', 'terraform', 'ansible',
-    'react', 'vue', 'angular', 'node', 'express', 'django', 'fastapi', 'flask',
-    'graphql', 'rest api', 'microservices', 'ci/cd', 'jenkins', 'github', 'gitlab',
-    'machine learning', 'deep learning', 'nlp', 'tensorflow', 'pytorch', 'scikit-learn'
-  ];
+  const jdSkills = extractSkillsFromText(jdText);
+  const resumeSkills = extractSkillsFromText(resumeText);
 
-  const resumeSkills = technicalSkills.filter(skill => 
-    new RegExp(`\\b${skill}\\b`, 'i').test(resumeText)
-  );
+  const matched: string[] = [];
+  const missing: string[] = [];
 
-  const jdSkills = technicalSkills.filter(skill => 
-    new RegExp(`\\b${skill}\\b`, 'i').test(jdText)
-  );
+  for (const skill of jdSkills) {
+    if (resumeSkills.has(skill)) {
+      matched.push(skill);
+    } else {
+      missing.push(skill);
+    }
+  }
 
-  const matched = resumeSkills.filter(skill => jdSkills.includes(skill));
-  const score = jdSkills.length > 0 ? (matched.length / jdSkills.length) * 100 : 50;
+  const score = jdSkills.size > 0
+    ? (matched.length / jdSkills.size) * 100
+    : 50;
 
   return {
     score: Math.min(score, 100),
-    matchedSkills: matched
+    matchedSkills: matched,
+    missingSkills: missing.slice(0, 8),
   };
 }
 
+function calculateSemanticSimilarity(resumeText: string, jdText: string): number {
+  const resumeTerms = new Set(extractNgrams(resumeText, 2).map(normalizeSkill));
+  const jdTerms = new Set(extractNgrams(jdText, 2).map(normalizeSkill));
+
+  const intersection = [...resumeTerms].filter(t => jdTerms.has(t));
+  const union = new Set([...resumeTerms, ...jdTerms]);
+
+  const jaccard = union.size > 0 ? (intersection.length / union.size) * 100 : 0;
+
+  const jdSkills = extractSkillsFromText(jdText);
+  const resumeSkills = extractSkillsFromText(resumeText);
+  const sharedSkills = [...jdSkills].filter(s => resumeSkills.has(s));
+  const domainBoost = Math.min(sharedSkills.length * 3, 25);
+
+  return Math.min(jaccard + domainBoost, 100);
+}
+
+function calculateFormatReadiness(resumeText: string): number {
+  let score = 0;
+  const lines = resumeText.split('\n');
+
+  if (/@[a-z0-9.-]+\.[a-z]{2,}/i.test(resumeText)) score += 5;     
+  if (/(\+?\d[\d\s\-().]{7,}\d)/.test(resumeText)) score += 5;
+  if (/linkedin\.com\/in\//i.test(resumeText)) score += 5;
+
+  const sectionPatterns = [
+    /^(experience|work experience|professional experience|employment)/im,
+    /^(education|academic background)/im,
+    /^(skills|technical skills|core competencies)/im,
+    /^(projects|personal projects|key projects)/im,
+  ];
+  for (const p of sectionPatterns) {
+    if (p.test(resumeText)) score += 5;
+  }
+
+  const datePatterns = [
+    /\b(jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)[a-z]*\.?\s+\d{4}/i,
+    /\b\d{2}\/\d{4}\b/,
+    /\b(20\d{2})\s*[-–—]\s*(20\d{2}|present|current)/i,
+  ];
+  if (datePatterns.some(p => p.test(resumeText))) score += 10;
+
+  const metricMatches = resumeText.match(
+    /\b(\d+[\+%x]|\d+\s*(percent|times|users|downloads|ms|seconds|hours|days|weeks))\b/gi
+  );
+  if (metricMatches && metricMatches.length >= 2) score += 8;
+  if (metricMatches && metricMatches.length >= 5) score += 7;
+
+  const actionVerbPattern = /^[\s\-–—•*]\s*(built|developed|designed|architected|implemented|created|engineered|deployed|managed|led|mentored|optimized|improved|reduced|increased|automated|integrated|launched|shipped|delivered|scaled|migrated)\b/im;
+  if (actionVerbPattern.test(resumeText)) score += 10;
+
+  const wordCount = resumeText.split(/\s+/).filter(Boolean).length;
+  if (wordCount >= 200 && wordCount <= 800) score += 10;
+
+  if (/github\.com|portfolio|vercel\.app|netlify\.app/i.test(resumeText)) score += 5;
+  if (/^(summary|profile|about|objective|professional summary)/im.test(resumeText)) score += 5;
+
+  return Math.min(score, 100);
+}
+
 export function calculateATSScore(resumeText: string, jdText: string): ATSScore {
-  const semanticScore = calculateSemanticSimilarity(resumeText, jdText);
   const keywordData = calculateKeywordCoverage(resumeText, jdText);
-  const formatScore = calculateFormatReadiness(resumeText);
   const skillsData = calculateSkillsMatch(resumeText, jdText);
+  const semanticScore = calculateSemanticSimilarity(resumeText, jdText);
+  const formatScore = calculateFormatReadiness(resumeText);
 
   const overallScore = Math.round(
-    semanticScore * 0.25 +   
-    keywordData.score * 0.35 +  
-    formatScore * 0.20 +         
-    skillsData.score * 0.20      
+    keywordData.score  * 0.35 +
+    skillsData.score   * 0.30 +
+    semanticScore      * 0.20 +
+    formatScore        * 0.15
   );
 
   return {
@@ -160,8 +285,8 @@ export function calculateATSScore(resumeText: string, jdText: string): ATSScore 
     breakdown: {
       jdKeywords: keywordData.matched,
       matchedKeywords: keywordData.matched,
-      missingKeywords: keywordData.missing
-    }
+      missingKeywords: keywordData.missing,
+    },
   };
 }
 
@@ -172,35 +297,34 @@ export function calculateResumeHealthScore(resumeText: string): {
   formatting: number;
   content: number;
 } {
-  let sectionScore = 0;
-  let metricsScore = 0;
+  const hasExperience = /^(experience|professional experience|work experience)/im.test(resumeText);
+  const hasEducation  = /^(education|academic)/im.test(resumeText);
+  const hasSkills     = /^(skills|technical skills)/im.test(resumeText);
+  const hasSummary    = /^(summary|profile|about|objective)/im.test(resumeText);
+  const hasProjects   = /^(projects|personal projects)/im.test(resumeText);
+
+  const sectionScore = [hasExperience, hasEducation, hasSkills, hasSummary, hasProjects]
+    .filter(Boolean).length * 12;
+
+  const metricMatches = resumeText.match(
+    /\b(\d+[\+%x]|\d+\s*(percent|times|users|downloads|ms|seconds))\b/gi
+  ) || [];
+  const metricsScore = Math.min(metricMatches.length * 4, 25);
+
   let contentScore = 0;
-
-  const hasExperience = /experience|work/i.test(resumeText);
-  const hasEducation = /education|degree|university/i.test(resumeText);
-  const hasSkills = /skills|technical/i.test(resumeText);
-  const hasSummary = /summary|professional|about/i.test(resumeText);
-
-  sectionScore = [hasExperience, hasEducation, hasSkills, hasSummary]
-    .filter(Boolean).length * 15;
-
-  const metricCount = (resumeText.match(/\d+%|improved|reduced|optimized|achieved|accelerated/gi) || []).length;
-  metricsScore = Math.min(metricCount * 3, 25);
-
-  const lines = resumeText.split('\n').filter(l => l.trim()).length;
-  const wordCount = resumeText.split(/\s+/).length;
-  
-  if (lines >= 20 && wordCount >= 200) contentScore += 15;
-  if (metricCount >= 3) contentScore += 10;
-  if (/https?:\/\/|linkedin|github|portfolio/i.test(resumeText)) contentScore += 10;
+  const wordCount = resumeText.split(/\s+/).filter(Boolean).length;
+  if (wordCount >= 200) contentScore += 8;
+  if (metricMatches.length >= 3) contentScore += 7;
+  if (/github\.com|portfolio|vercel\.app/i.test(resumeText)) contentScore += 5;
+  if (/linkedin\.com\/in\//i.test(resumeText)) contentScore += 5;
 
   const totalScore = Math.min(sectionScore + metricsScore + contentScore, 100);
 
   return {
     score: totalScore,
     metrics: metricsScore,
-    sections: sectionScore,
+    sections: Math.min(sectionScore, 60),
     formatting: 20,
-    content: contentScore
+    content: contentScore,
   };
 }
