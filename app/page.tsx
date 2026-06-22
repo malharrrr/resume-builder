@@ -30,6 +30,137 @@ interface Analytics {
   };
 }
 
+function scoreColor(s: number) {
+  if (s >= 75) return '#639922';
+  if (s >= 50) return '#BA7517';
+  return '#E24B4A';
+}
+
+function scoreLabel(s: number) {
+  if (s >= 75) return 'Strong';
+  if (s >= 50) return 'Moderate';
+  return 'Needs work';
+}
+
+function verdict(s: number): { label: string; sub: string } {
+  if (s >= 80) return { label: 'Strong match', sub: 'Your resume aligns well with this role. Focus on the missing keywords below to push your score even higher.' };
+  if (s >= 65) return { label: 'Good match', sub: 'You meet most of the requirements. A few targeted additions could significantly improve your chances.' };
+  if (s >= 45) return { label: 'Partial match', sub: 'There are some gaps between your resume and this role. Consider adding missing skills if you genuinely have them.' };
+  return { label: 'Weak match', sub: 'This role requires skills not well represented in your resume. Tailoring your content is strongly recommended.' };
+}
+
+function ATSDashboard({ analytics }: { analytics: Analytics }) {
+  const { atsScores, improvement } = analytics;
+  const overall = atsScores.overallScore;
+  const delta = improvement.improvement;
+  const v = verdict(overall);
+  const color = scoreColor(overall);
+
+  const r = 40, cx = 48, cy = 48;
+  const circ = 2 * Math.PI * r;
+  const filled = (overall / 100) * circ;
+
+  const bars = [
+    { label: 'Keyword match', score: atsScores.keywordCoverage, desc: "How many of the job description's key terms appear in your resume" },
+    { label: 'Skills match', score: atsScores.skillsMatch, desc: 'Technical skills from the job description found in your resume' },
+    { label: 'Content relevance', score: atsScores.semanticSimilarity, desc: "How closely your resume's concepts match the role's language" },
+    { label: 'Format readiness', score: atsScores.formatReadiness, desc: 'How easily an ATS parser can read your resume structure' },
+  ];
+
+  const tips: string[] = [];
+  if (atsScores.breakdown.missingKeywords.length > 0) {
+    tips.push(`Add missing keywords — ${atsScores.breakdown.missingKeywords.slice(0, 3).join(', ')} — into your bullet points naturally where applicable.`);
+  }
+  tips.push('Quantify more achievements with numbers (%, ms, users) — metrics stand out to both ATS systems and human reviewers.');
+  if (atsScores.formatReadiness < 70) {
+    tips.push('Improve format score: ensure section headers (Experience, Education, Skills) are clearly labelled and dates are in a standard format like 06/2025.');
+  }
+
+  return (
+    <div className="w-full rounded-lg border border-zinc-800 overflow-hidden mb-3" style={{ maxHeight: '340px', overflowY: 'auto' }}>
+      {/* Hero row */}
+      <div className="flex items-center gap-4 p-4 bg-zinc-900 border-b border-zinc-800">
+        <div className="relative flex-shrink-0" style={{ width: 80, height: 80 }}>
+          <svg viewBox="0 0 96 96" width="80" height="80" fill="none" role="img" aria-label={`ATS score ${overall} out of 100`}>
+            <circle cx={cx} cy={cy} r={r} stroke="#27272a" strokeWidth="8"/>
+            <circle cx={cx} cy={cy} r={r} stroke={color} strokeWidth="8"
+              strokeDasharray={`${filled} ${circ - filled}`}
+              strokeDashoffset={circ * 0.25}
+              strokeLinecap="round"/>
+          </svg>
+          <div className="absolute inset-0 flex flex-col items-center justify-center">
+            <span className="text-lg font-semibold leading-none" style={{ color }}>{overall}</span>
+            <span className="text-xs text-zinc-500 mt-0.5">/100</span>
+          </div>
+        </div>
+        <div className="flex-1 min-w-0">
+          <p className="text-xs text-zinc-500 mb-0.5">ATS compatibility score</p>
+          <p className="text-sm font-semibold text-white mb-1">{v.label}</p>
+          <p className="text-xs text-zinc-400 leading-relaxed">{v.sub}</p>
+          <div className={`inline-flex items-center gap-1.5 text-xs font-semibold mt-2 px-2.5 py-1 rounded-full ${
+            delta >= 0 ? 'bg-green-900/30 text-green-400' : 'bg-red-900/30 text-red-400'
+          }`}>
+            <svg width="10" height="10" viewBox="0 0 10 10" fill="none" aria-hidden="true">
+              {delta >= 0
+                ? <path d="M5 1L9 5H6V9H4V5H1L5 1Z" fill="currentColor"/>
+                : <path d="M5 9L1 5H4V1H6V5H9L5 9Z" fill="currentColor"/>}
+            </svg>
+            {delta >= 0 ? '+' : ''}{delta} vs original resume ({improvement.beforeATS} → {improvement.afterATS})
+          </div>
+        </div>
+      </div>
+
+      <div className="p-3 bg-zinc-950 border-b border-zinc-800 grid grid-cols-2 gap-2">
+        {bars.map(bar => (
+          <div key={bar.label} className="bg-zinc-900 rounded-md p-2.5">
+            <div className="flex justify-between items-baseline mb-1">
+              <span className="text-xs text-zinc-400">{bar.label}</span>
+              <span className="text-xs font-semibold" style={{ color: scoreColor(bar.score) }}>{bar.score}/100</span>
+            </div>
+            <div className="h-1.5 bg-zinc-800 rounded-full overflow-hidden mb-1.5">
+              <div className="h-full rounded-full" style={{ width: `${bar.score}%`, background: scoreColor(bar.score) }}/>
+            </div>
+            <div className="flex justify-between items-center">
+              <span className="text-xs font-medium" style={{ color: scoreColor(bar.score) }}>{scoreLabel(bar.score)}</span>
+            </div>
+          </div>
+        ))}
+      </div>
+
+      <div className="grid grid-cols-2 border-b border-zinc-800">
+        <div className="p-3 bg-zinc-950 border-r border-zinc-800">
+          <p className="text-xs font-semibold text-green-500 mb-2">✓ Found ({atsScores.breakdown.matchedKeywords.length})</p>
+          <div className="flex flex-wrap gap-1">
+            {atsScores.breakdown.matchedKeywords.slice(0, 8).map((kw, i) => (
+              <span key={i} className="text-xs bg-green-900/25 text-green-400 border border-green-900/40 px-1.5 py-0.5 rounded-full">{kw}</span>
+            ))}
+          </div>
+        </div>
+        <div className="p-3 bg-zinc-950">
+          <p className="text-xs font-semibold text-red-400 mb-2">✕ Missing ({atsScores.breakdown.missingKeywords.length})</p>
+          <div className="flex flex-wrap gap-1">
+            {atsScores.breakdown.missingKeywords.slice(0, 5).map((kw, i) => (
+              <span key={i} className="text-xs bg-red-900/25 text-red-400 border border-red-900/40 px-1.5 py-0.5 rounded-full">{kw}</span>
+            ))}
+          </div>
+        </div>
+      </div>
+
+      <div className="p-3 bg-zinc-900">
+        <p className="text-xs font-semibold text-zinc-400 uppercase tracking-wider mb-2">How to improve</p>
+        <div className="space-y-1.5">
+          {tips.map((tip, i) => (
+            <div key={i} className="flex gap-2 text-xs text-zinc-400 leading-relaxed">
+              <span className="text-zinc-600 flex-shrink-0 mt-0.5">→</span>
+              <span>{tip}</span>
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export default function ResumeBuilder() {
   const [resumeFile, setResumeFile] = useState<File | null>(null);
   const [jd, setJd] = useState('');
@@ -39,7 +170,6 @@ export default function ResumeBuilder() {
   const [isGenerating, setIsGenerating] = useState(false);
   const [lastHash, setLastHash] = useState<string | null>(null);
   const [analytics, setAnalytics] = useState<Analytics | null>(null);
-  const [showAnalytics, setShowAnalytics] = useState(false);
 
   const logUserAction = async (action: string, details?: any) => {
     try {
@@ -88,7 +218,6 @@ export default function ResumeBuilder() {
     setPdfBase64(null);
     setTexData(null);
     setAnalytics(null);
-    setShowAnalytics(false);
     
     try {
       const formData = new FormData();
@@ -123,7 +252,6 @@ export default function ResumeBuilder() {
       
       if (data.analytics) {
         setAnalytics(data.analytics);
-        setShowAnalytics(true);
       }
 
       logUserAction('GENERATE_COMPLETE', { totalTimeMs: Math.round(performance.now() - generateStartTime) });
@@ -183,18 +311,6 @@ export default function ResumeBuilder() {
     a.click();
     document.body.removeChild(a);
     URL.revokeObjectURL(url);
-  };
-
-  const getScoreColor = (score: number) => {
-    if (score >= 80) return 'text-green-400';
-    if (score >= 60) return 'text-yellow-400';
-    return 'text-orange-400';
-  };
-
-  const getScoreBgColor = (score: number) => {
-    if (score >= 80) return 'bg-green-900/20';
-    if (score >= 60) return 'bg-yellow-900/20';
-    return 'bg-orange-900/20';
   };
 
   return (
@@ -266,14 +382,6 @@ export default function ResumeBuilder() {
               <div className="flex justify-between items-center mb-4 flex-wrap gap-2">
                 <span className="text-sm font-medium text-zinc-400">ATS Analysis Complete</span>
                 <div className="flex items-center gap-2 flex-wrap">
-                  {analytics && (
-                    <button 
-                      onClick={() => setShowAnalytics(!showAnalytics)}
-                      className="flex items-center gap-2 px-3 py-1.5 text-xs font-semibold text-white bg-blue-900 border border-blue-700 rounded hover:bg-blue-800 transition-colors"
-                    >
-                      {showAnalytics ? 'Hide' : 'Show'} Analysis
-                    </button>
-                  )}
                   <button onClick={downloadPdf} className="flex items-center gap-2 px-3 py-1.5 text-xs font-semibold text-white bg-zinc-900 border border-zinc-800 rounded hover:bg-zinc-800 transition-colors">
                     Get PDF
                   </button>
@@ -283,104 +391,9 @@ export default function ResumeBuilder() {
                 </div>
               </div>
 
-              {showAnalytics && analytics ? (
-                <div className="w-full flex-grow rounded-md overflow-hidden bg-zinc-900 border border-zinc-800 p-4 mb-4 overflow-y-auto max-h-96">
-                  <div className="space-y-4">
-                    <div>
-                      <h3 className="text-sm font-semibold text-white mb-3">ATS Score Analysis</h3>
-                      
-                      <div className={`${getScoreBgColor(analytics.atsScores.overallScore)} rounded-lg p-4 mb-4 border border-zinc-700`}>
-                        <p className="text-xs text-zinc-400 mb-2">Overall ATS Score</p>
-                        <p className={`text-4xl font-bold ${getScoreColor(analytics.atsScores.overallScore)}`}>
-                          {analytics.atsScores.overallScore}
-                        </p>
-                      </div>
+              {analytics && <ATSDashboard analytics={analytics} />}
 
-                      <div className="grid grid-cols-2 gap-3 mb-4">
-                        <div className="bg-zinc-800 rounded p-3">
-                          <p className="text-xs text-zinc-400 mb-1">Keyword Coverage</p>
-                          <p className={`text-2xl font-bold ${getScoreColor(analytics.atsScores.keywordCoverage)}`}>
-                            {analytics.atsScores.keywordCoverage}%
-                          </p>
-                          <p className="text-xs text-zinc-500">JD keywords matched</p>
-                        </div>
-
-                        <div className="bg-zinc-800 rounded p-3">
-                          <p className="text-xs text-zinc-400 mb-1">Format Readiness</p>
-                          <p className={`text-2xl font-bold ${getScoreColor(analytics.atsScores.formatReadiness)}`}>
-                            {analytics.atsScores.formatReadiness}%
-                          </p>
-                          <p className="text-xs text-zinc-500">ATS parseability</p>
-                        </div>
-
-                        <div className="bg-zinc-800 rounded p-3">
-                          <p className="text-xs text-zinc-400 mb-1">Semantic Match</p>
-                          <p className={`text-2xl font-bold ${getScoreColor(analytics.atsScores.semanticSimilarity)}`}>
-                            {analytics.atsScores.semanticSimilarity}%
-                          </p>
-                          <p className="text-xs text-zinc-500">Concept alignment</p>
-                        </div>
-
-                        <div className="bg-zinc-800 rounded p-3">
-                          <p className="text-xs text-zinc-400 mb-1">Skills Match</p>
-                          <p className={`text-2xl font-bold ${getScoreColor(analytics.atsScores.skillsMatch)}`}>
-                            {analytics.atsScores.skillsMatch}%
-                          </p>
-                          <p className="text-xs text-zinc-500">Technical overlap</p>
-                        </div>
-                      </div>
-
-                      <div className="bg-green-900/20 border border-green-700 rounded p-3 mb-4">
-                        <p className="text-xs font-semibold text-green-200 mb-2">ATS Improvement</p>
-                        <div className="flex justify-between text-xs">
-                          <div>
-                            <p className="text-zinc-400">Baseline</p>
-                            <p className="font-bold text-white">{analytics.improvement.beforeATS}</p>
-                          </div>
-                          <div className="text-center">
-                            <p className={`font-bold ${analytics.improvement.improvement >= 0 ? 'text-green-400' : 'text-orange-400'}`}>
-                              {analytics.improvement.improvement >= 0 ? '+' : ''}{analytics.improvement.improvement}
-                            </p>
-                          </div>
-                          <div>
-                            <p className="text-zinc-400">Optimized</p>
-                            <p className="font-bold text-green-400">{analytics.improvement.afterATS}</p>
-                          </div>
-                        </div>
-                      </div>
-
-                      {analytics.atsScores.breakdown.matchedKeywords.length > 0 && (
-                        <div className="bg-zinc-800 rounded p-3 border border-zinc-700">
-                          <p className="text-xs font-semibold text-white mb-2">Matched Keywords ({analytics.atsScores.breakdown.matchedKeywords.length})</p>
-                          <div className="flex flex-wrap gap-1">
-                            {analytics.atsScores.breakdown.matchedKeywords.slice(0, 8).map((kw, idx) => (
-                              <span key={idx} className="text-xs bg-green-900/40 text-green-300 px-2 py-1 rounded">
-                                {kw}
-                              </span>
-                            ))}
-                          </div>
-                        </div>
-                      )}
-
-                      {analytics.atsScores.breakdown.missingKeywords.length > 0 && (
-                        <div className="bg-zinc-800 rounded p-3 border border-zinc-700 mt-3">
-                          <p className="text-xs font-semibold text-white mb-2">Missing Keywords ({analytics.atsScores.breakdown.missingKeywords.length})</p>
-                          <div className="flex flex-wrap gap-1">
-                            {analytics.atsScores.breakdown.missingKeywords.slice(0, 5).map((kw, idx) => (
-                              <span key={idx} className="text-xs bg-orange-900/40 text-orange-300 px-2 py-1 rounded">
-                                {kw}
-                              </span>
-                            ))}
-                          </div>
-                          <p className="text-xs text-zinc-400 mt-2">Consider adding these terms if relevant to your background</p>
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                </div>
-              ) : null}
-
-              <div className="relative w-full flex-grow rounded-md overflow-hidden bg-white border border-zinc-800">
+              <div className="relative w-full flex-grow rounded-md overflow-hidden bg-white border border-zinc-800 mt-4">
                 <iframe src={pdfUrl} className="absolute inset-0 w-full h-full" title="Resume Preview"/>
               </div>
             </div>
@@ -400,22 +413,44 @@ export default function ResumeBuilder() {
               </div>
 
               {analytics && (
-                <div className="w-full max-w-sm bg-zinc-900 rounded-lg p-4 border border-zinc-800 mb-4">
-                  <p className="text-xs font-semibold text-white mb-3">ATS Score</p>
-                  <div className="grid grid-cols-2 gap-2 text-xs">
-                    <div>
-                      <p className="text-zinc-400">Overall</p>
-                      <p className={`text-2xl font-bold ${getScoreColor(analytics.atsScores.overallScore)}`}>
-                        {analytics.atsScores.overallScore}
-                      </p>
+                <div className="w-full max-w-sm rounded-lg border border-zinc-800 overflow-hidden mb-4">
+                  <div className="bg-zinc-900 px-4 py-3 flex items-center justify-between">
+                    <span className="text-xs font-semibold text-zinc-400 uppercase tracking-wider">ATS Score</span>
+                    <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${
+                      analytics.atsScores.overallScore >= 75 ? 'bg-green-900/40 text-green-400' :
+                      analytics.atsScores.overallScore >= 50 ? 'bg-yellow-900/40 text-yellow-400' :
+                      'bg-red-900/40 text-red-400'
+                    }`}>
+                      {analytics.atsScores.overallScore >= 75 ? 'Strong match' :
+                       analytics.atsScores.overallScore >= 50 ? 'Good match' : 'Needs work'}
+                    </span>
+                  </div>
+                  <div className="bg-zinc-950 px-4 py-4 flex items-center gap-4">
+                    <div className="text-center">
+                      <p className={`text-4xl font-bold ${
+                        analytics.atsScores.overallScore >= 75 ? 'text-green-400' :
+                        analytics.atsScores.overallScore >= 50 ? 'text-yellow-400' : 'text-red-400'
+                      }`}>{analytics.atsScores.overallScore}</p>
+                      <p className="text-xs text-zinc-500 mt-0.5">out of 100</p>
                     </div>
-                    <div>
-                      <p className="text-zinc-400">Improvement</p>
-                      <p className={`text-2xl font-bold ${analytics.improvement.improvement >= 0 ? 'text-green-400' : 'text-orange-400'}`}>
-                        {analytics.improvement.improvement >= 0 ? '+' : ''}{analytics.improvement.improvement}
+                    <div className="flex-1 border-l border-zinc-800 pl-4">
+                      <p className="text-xs text-zinc-500 mb-1">vs your original resume</p>
+                      <p className={`text-lg font-semibold ${analytics.improvement.improvement >= 0 ? 'text-green-400' : 'text-orange-400'}`}>
+                        {analytics.improvement.improvement >= 0 ? '+' : ''}{analytics.improvement.improvement} points
                       </p>
+                      <p className="text-xs text-zinc-600">{analytics.improvement.beforeATS} → {analytics.improvement.afterATS}</p>
                     </div>
                   </div>
+                  {analytics.atsScores.breakdown.missingKeywords.length > 0 && (
+                    <div className="bg-zinc-900 border-t border-zinc-800 px-4 py-3">
+                      <p className="text-xs text-zinc-500 mb-2">Add these keywords to improve your score:</p>
+                      <div className="flex flex-wrap gap-1.5">
+                        {analytics.atsScores.breakdown.missingKeywords.slice(0, 4).map((kw, idx) => (
+                          <span key={idx} className="text-xs bg-red-900/30 text-red-400 border border-red-900/50 px-2 py-0.5 rounded-full">{kw}</span>
+                        ))}
+                      </div>
+                    </div>
+                  )}
                 </div>
               )}
 
