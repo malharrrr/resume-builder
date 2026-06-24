@@ -8,7 +8,7 @@ import { promisify } from 'util';
 import fs from 'fs/promises';
 import path from 'path';
 import crypto from 'crypto';
-import { calculateATSScore, calculateResumeHealthScore } from '../ats_scoring_system';
+import { calculateATSScore, calculateATSScoreHybrid, calculateResumeHealthScore } from '../ats_scoring_system';
 import { pdfjsLib } from '../pdf-loader';
 
 Handlebars.Utils.escapeExpression = function (text: any) {
@@ -457,7 +457,7 @@ export async function POST(req: NextRequest) {
     const [pdfBuffer, atsScores] = await Promise.all([
       execAsync(`pdflatex -interaction=nonstopmode -halt-on-error --synctex=0 -output-directory=${tempDir} ${texPath}`)
         .then(() => fs.readFile(pdfPath)),
-      Promise.resolve(calculateATSScore(optimizedResumeText, trimmedJD))
+      Promise.resolve(calculateATSScoreHybrid(optimizedResumeText, pureTextResume, trimmedJD))
     ]);
 
     console.log(`[GENERATE_SUCCESS] Job ${uniqueId} | ATS: ${atsScores.overallScore}/100 | Baseline: ${baselineATSScore.overallScore}/100 | Health: ${resumeHealthScore.score}/100`);

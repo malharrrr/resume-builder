@@ -330,13 +330,44 @@ export function calculateATSScore(resumeText: string, jdText: string): ATSScore 
   );
 
   return {
+    overallScore:       Math.min(overallScore, 100),
+    semanticSimilarity: Math.round(semanticScore),
+    keywordCoverage:    Math.round(keywordData.score),
+    formatReadiness:    Math.round(formatScore),
+    skillsMatch:        Math.round(skillsData.score),
+    breakdown: {
+      jdKeywords:      keywordData.allJdKeywords,
+      matchedKeywords: keywordData.matched,
+      missingKeywords: keywordData.missing,
+    },
+  };
+}
+
+export function calculateATSScoreHybrid(
+  optimizedContentText: string,
+  structuredResumeText: string,
+  jdText: string
+): ATSScore {
+  const keywordData   = calculateKeywordCoverage(optimizedContentText, jdText);
+  const skillsData    = calculateSkillsMatch(optimizedContentText, jdText);
+  const semanticScore = calculateSemanticSimilarity(optimizedContentText, jdText);
+  const formatScore   = calculateFormatReadiness(structuredResumeText);
+
+  const overallScore = Math.round(
+    keywordData.score  * 0.35 +
+    skillsData.score   * 0.30 +
+    semanticScore      * 0.20 +
+    formatScore        * 0.15
+  );
+
+  return {
     overallScore: Math.min(overallScore, 100),
     semanticSimilarity: Math.round(semanticScore),
     keywordCoverage: Math.round(keywordData.score),
     formatReadiness: Math.round(formatScore),
     skillsMatch: Math.round(skillsData.score),
     breakdown: {
-      jdKeywords: keywordData.matched,
+      jdKeywords: keywordData.allJdKeywords,
       matchedKeywords: keywordData.matched,
       missingKeywords: keywordData.missing,
     },
